@@ -72,6 +72,8 @@ export function RepositoryIconPicker({
 
   const setIcon = (repoIcon: RepoIcon | null) => updateRepo(repo.id, { repoIcon })
   const setBadgeColor = (badgeColor: string) => updateRepo(repo.id, { badgeColor })
+  const setSidebarHighlight = (sidebarHighlight: boolean) =>
+    updateRepo(repo.id, { sidebarHighlight })
 
   return (
     <div className="space-y-3">
@@ -96,7 +98,12 @@ export function RepositoryIconPicker({
         </Button>
       </div>
 
-      <RepositoryIconColorSection badgeColor={repo.badgeColor} onBadgeColorChange={setBadgeColor} />
+      <RepositoryIconColorSection
+        badgeColor={repo.badgeColor}
+        onBadgeColorChange={setBadgeColor}
+        sidebarHighlight={repo.sidebarHighlight === true}
+        onSidebarHighlightChange={setSidebarHighlight}
+      />
 
       <RepositoryIconTabs
         initialTab={initialTab}

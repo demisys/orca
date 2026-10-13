@@ -13,7 +13,9 @@ import {
 } from '../../../../runtime/repository-github/repository-icon-github'
 import { useTranslate } from '@/i18n/use-translate'
 
-export type RepoAppearanceUpdate = Partial<Pick<Repo, 'repoIcon' | 'badgeColor' | 'upstream'>>
+export type RepoAppearanceUpdate = Partial<
+  Pick<Repo, 'repoIcon' | 'badgeColor' | 'upstream' | 'sidebarHighlight'>
+>
 
 export type RepositoryIconActions = {
   loadingGitHub: boolean

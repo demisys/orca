@@ -6,6 +6,7 @@ import {
 } from '../../../../../../shared/repository/appearance/repo-badge-color'
 import { Label } from '../../../ui/label'
 import { ColorPicker } from '../../../ui/color-picker'
+import { SettingsSwitchRow } from '../../form-controls/SettingsFormControls'
 import { cn } from '@/lib/class-names'
 import { useTranslate } from '@/i18n/use-translate'
 
@@ -18,13 +19,18 @@ type RepositoryIconColorSectionProps = {
   compact?: boolean
   /** The color Auto currently resolves to, so the Auto swatch previews it. */
   autoColor?: string
+  /** Omitted where the sidebar highlight switch doesn't belong, like the hover card. */
+  sidebarHighlight?: boolean
+  onSidebarHighlightChange?: (enabled: boolean) => void
 }
 
 export function RepositoryIconColorSection({
   badgeColor,
   onBadgeColorChange,
   compact = false,
-  autoColor
+  autoColor,
+  sidebarHighlight = false,
+  onSidebarHighlightChange
 }: RepositoryIconColorSectionProps): React.JSX.Element {
   const t = useTranslate()
   const selectedBadgeColor = normalizeRepoBadgeColor(badgeColor) ?? DEFAULT_REPO_BADGE_COLOR
@@ -155,6 +161,20 @@ export function RepositoryIconColorSection({
           />
         )}
       </div>
+      {onSidebarHighlightChange && !compact && (
+        <SettingsSwitchRow
+          label={t(
+            'auto.components.settings.RepositoryIconPicker.7a3c1e9f52',
+            'Highlight project in sidebar'
+          )}
+          description={t(
+            'auto.components.settings.RepositoryIconPicker.4b8d2f6a13',
+            'Tint the project and all its workspaces with this color.'
+          )}
+          checked={sidebarHighlight}
+          onChange={() => onSidebarHighlightChange(!sidebarHighlight)}
+        />
+      )}
     </div>
   )
 }
