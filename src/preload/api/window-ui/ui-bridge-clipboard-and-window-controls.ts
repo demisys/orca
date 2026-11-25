@@ -180,6 +180,9 @@ export const uiClipboardAndWindowControlsApi = {
   setShortcutRecorderFocused: (focused: boolean): void => {
     ipcRenderer.send('ui:setShortcutRecorderFocused', focused)
   },
+  setVimNormalModeFocused: (focused: boolean): void => {
+    ipcRenderer.send('ui:setVimNormalModeFocused', focused)
+  },
   onRichMarkdownContextCommand: (
     callback: (payload: RichMarkdownContextMenuCommandPayload) => void
   ): (() => void) => {

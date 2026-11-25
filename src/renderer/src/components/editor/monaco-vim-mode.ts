@@ -1,6 +1,8 @@
 import type { editor } from 'monaco-editor'
 import type { initVimMode as InitVimMode, VimAdapterInstance } from 'monaco-vim'
 import { addAppKeyListener, removeAppKeyListener } from '@/lib/keyboard/app-keyboard-router'
+import { getShortcutPlatform } from '@/lib/keyboard/shortcut-platform'
+import { vimPriorityCtrlLetter } from '../../../../shared/editor/keybindings/vim-priority-ctrl-chords'
 
 // monaco-vim is a keymap emulator, not Neovim. Verified working against the live editor: motions,
 // operators, registers (yank/paste), visual mode, macros (`qa`…`q` / `@a`), and `:%s` substitution.
@@ -21,7 +23,7 @@ export type VimEditorActions = {
   editor: editor.IStandaloneCodeEditor
 }
 
-type VimEntry = { actions: VimEditorActions; insertMode: boolean }
+type VimEntry = { actions: VimEditorActions; insertMode: boolean; textFocused: boolean }
 type VimExParams = { args?: string[]; argString?: string }
 type VimRuntime = {
   Vim: {
@@ -38,9 +40,7 @@ type VimRuntime = {
 // that ran them; a focus change can then never redirect `:w`/`:q` to another split.
 const entries = new Map<VimAdapterInstance, VimEntry>()
 let runtime: VimRuntime | null = null
-
-// Ctrl chords vim relies on that Orca's Mod shortcuts (Ctrl on Linux/Windows) would otherwise take.
-const VIM_PRIORITY_CTRL_KEYS = new Set(['a', 'b', 'd', 'e', 'f', 'i', 'o', 'r', 'u', 'v', 'x', 'y'])
+let reportedChordFocus = false
 
 /**
  * Apply one `:set` token (e.g. `nowrap`, `number`, `tabstop=4`) to the Monaco editor. Monaco has no
@@ -92,13 +92,21 @@ function applySetOption(ed: editor.IStandaloneCodeEditor, token: string): void {
   }
 }
 
-function ctrlChordLetter(event: KeyboardEvent): string | null {
-  if (!event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) {
-    return null
+// Only where Mod is Ctrl (Linux/Windows) do vim's Ctrl chords collide with app shortcuts.
+function claimsCtrlChords(): boolean {
+  return getShortcutPlatform() !== 'darwin'
+}
+
+// Why: main resolves window shortcuts before the renderer sees keydown, so mirror vim normal-mode focus.
+function syncChordFocus(): void {
+  let focused = false
+  for (const entry of entries.values()) {
+    focused ||= entry.textFocused && !entry.insertMode
   }
-  const fromCode = /^Key([A-Z])$/.exec(event.code)?.[1]?.toLowerCase()
-  const letter = /^[a-z]$/i.test(event.key) ? event.key.toLowerCase() : fromCode
-  return letter && VIM_PRIORITY_CTRL_KEYS.has(letter) ? letter : null
+  if (focused !== reportedChordFocus) {
+    reportedChordFocus = focused
+    window.api?.ui?.setVimNormalModeFocused?.(focused)
+  }
 }
 
 // Runs ahead of app shortcuts: a vim chord in normal/visual mode wins; insert mode keeps app shortcuts.
@@ -106,7 +114,14 @@ function claimVimCtrlChord(event: KeyboardEvent): void {
   if (event.defaultPrevented || event.isComposing || !runtime) {
     return
   }
-  const letter = ctrlChordLetter(event)
+  const letter = vimPriorityCtrlLetter({
+    control: event.ctrlKey,
+    meta: event.metaKey,
+    alt: event.altKey,
+    shift: event.shiftKey,
+    key: event.key,
+    code: event.code
+  })
   if (!letter) {
     return
   }
@@ -114,12 +129,11 @@ function claimVimCtrlChord(event: KeyboardEvent): void {
     if (!entry.actions.editor.hasTextFocus() || entry.insertMode) {
       continue
     }
-    const command = runtime.keyMap.vim?.call(`Ctrl-${letter}`, adapter)
-    if (!command) {
-      return
-    }
+    // Why consume even unmapped chords: vim ignores them in normal mode, and passing the key on
+    // would make monaco-vim run findKey (and record macros) a second time.
     event.preventDefault()
     event.stopImmediatePropagation()
+    const command = runtime.keyMap.vim?.call(`Ctrl-${letter}`, adapter)
     if (typeof command === 'function') {
       command()
     }
@@ -184,8 +198,10 @@ async function loadVimMode(): Promise<typeof InitVimMode> {
   const { initVimMode, VimMode } = await import('monaco-vim')
   if (!runtime) {
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: monaco-vim 0.4.4 attaches CodeMirror's Vim API and vim keymap to the exported adapter class at import; its published types omit them.
-    runtime = VimMode as unknown as VimRuntime
-    defineExCommands(runtime.Vim)
+    const candidate = VimMode as unknown as VimRuntime
+    // Assign only after registering, so a monaco-vim without `.Vim` fails every install, not just the first.
+    defineExCommands(candidate.Vim)
+    runtime = candidate
   }
   return initVimMode
 }
@@ -204,14 +220,33 @@ export async function installMonacoVimMode(
 ): Promise<VimModeController> {
   const initVimMode = await loadVimMode()
   const adapter = initVimMode(editorInstance, statusBarNode)
-  const entry: VimEntry = { actions, insertMode: false }
+  const entry: VimEntry = { actions, insertMode: false, textFocused: editorInstance.hasTextFocus() }
+  const claims = claimsCtrlChords()
   adapter.on('vim-mode-change', (event: { mode: string }) => {
     entry.insertMode = event.mode === 'insert' || event.mode === 'replace'
+    if (claims) {
+      syncChordFocus()
+    }
   })
-  if (entries.size === 0) {
+  const focusSubs = claims
+    ? [
+        editorInstance.onDidFocusEditorText(() => {
+          entry.textFocused = true
+          syncChordFocus()
+        }),
+        editorInstance.onDidBlurEditorText(() => {
+          entry.textFocused = false
+          syncChordFocus()
+        })
+      ]
+    : []
+  if (claims && entries.size === 0) {
     addAppKeyListener('keydown', claimVimCtrlChord, { first: true })
   }
   entries.set(adapter, entry)
+  if (claims) {
+    syncChordFocus()
+  }
   let disposed = false
   return {
     dispose: (): void => {
@@ -220,8 +255,14 @@ export async function installMonacoVimMode(
       }
       disposed = true
       entries.delete(adapter)
-      if (entries.size === 0) {
-        removeAppKeyListener('keydown', claimVimCtrlChord)
+      for (const sub of focusSubs) {
+        sub.dispose()
+      }
+      if (claims) {
+        syncChordFocus()
+        if (entries.size === 0) {
+          removeAppKeyListener('keydown', claimVimCtrlChord)
+        }
       }
       adapter.dispose()
     }

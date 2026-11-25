@@ -27,6 +27,7 @@ import { registerRendererDocumentNavigation } from '../security/renderer-documen
 import { createRendererRecoveryReloadWatchdog } from '../renderer-recovery/renderer-recovery-reload-watchdog'
 import { createRendererLaunchFailureBackoff } from '../renderer-recovery/renderer-launch-failure-backoff'
 import { trackRendererLivenessAtDeath } from '../renderer-recovery/renderer-liveness-at-death'
+import { mirrorRendererFocusFlag } from './renderer-focus-flag-mirror'
 
 export type MainWindowFocusLifecycle = {
   dispose: () => void
@@ -36,6 +37,7 @@ export type MainWindowFocusLifecycle = {
   isRendererProcessGone: () => boolean
   isShortcutRecorderFocused: () => boolean
   isTerminalInputFocused: () => boolean
+  isVimNormalModeFocused: () => boolean
   /** Relays powerMonitor 'resume' so a suspend-frozen recovery-reload timer does not fire against an unbudgeted load. */
   notifySystemResume: () => void
 }
@@ -56,7 +58,6 @@ export function installMainWindowFocusLifecycle(args: {
   // Terminal-input focus selects keybinding context; panel focus is the broader routing owner.
   let floatingTerminalInputFocused = false
   let floatingPanelFocused = false
-  let shortcutRecorderFocused = false
 
   const markdownFocusChannel = 'ui:setMarkdownEditorFocused'
   // Check sender and strict boolean so guests/malformed payloads cannot disable sidebar shortcuts.
@@ -89,15 +90,16 @@ export function installMainWindowFocusLifecycle(args: {
     floatingPanelFocused = payload.panelFocused === true || terminal
   }
   ipcMain.on(floatingFocusChannel, onFloatingFocus)
-  const shortcutRecorderFocusChannel = 'ui:setShortcutRecorderFocused'
   // Shortcut recording must receive the keys before main consumes their existing bindings.
-  const onShortcutRecorderFocused = (event: Electron.IpcMainEvent, focused: unknown): void => {
-    if (event.sender !== rendererWebContents) {
-      return
-    }
-    shortcutRecorderFocused = focused === true
-  }
-  ipcMain.on(shortcutRecorderFocusChannel, onShortcutRecorderFocused)
+  const shortcutRecorderFocus = mirrorRendererFocusFlag(
+    'ui:setShortcutRecorderFocused',
+    rendererWebContents
+  )
+  // Vim normal mode owns its Ctrl chords on Linux/Windows; routing lets them reach the renderer.
+  const vimNormalModeFocus = mirrorRendererFocusFlag(
+    'ui:setVimNormalModeFocused',
+    rendererWebContents
+  )
 
   let pendingRichMarkdownContextMenuTableTarget: RichMarkdownContextMenuTableTarget | null = null
   const onRichMarkdownContextMenuTarget = (event: Electron.IpcMainEvent, value: unknown): void => {
@@ -150,8 +152,9 @@ export function installMainWindowFocusLifecycle(args: {
     floatingTerminalInputFocused = false
     floatingPanelFocused = false
   }
-  const resetShortcutRecorderFocus = (): void => {
-    shortcutRecorderFocused = false
+  const resetRendererKeyOwnerFocus = (): void => {
+    shortcutRecorderFocus.reset()
+    vimNormalModeFocus.reset()
   }
   let rendererProcessGone = false
   registerRendererDocumentNavigation(rendererWebContents, () => {
@@ -160,7 +163,7 @@ export function installMainWindowFocusLifecycle(args: {
     resetMarkdownEditorFocus()
     resetTerminalInputFocus()
     resetFloatingTerminalInputFocus()
-    resetShortcutRecorderFocus()
+    resetRendererKeyOwnerFocus()
     return () => {
       if (
         rendererProcessGone ||
@@ -267,7 +270,7 @@ export function installMainWindowFocusLifecycle(args: {
     resetMarkdownEditorFocus()
     resetTerminalInputFocus()
     resetFloatingTerminalInputFocus()
-    resetShortcutRecorderFocus()
+    resetRendererKeyOwnerFocus()
     // macOS reports close teardown as renderer killed/SIGKILL; do not treat window-close noise as a crash.
     if (!isWindowClosing()) {
       // Let the recorder classify crashes so expected-teardown evidence remains reachable.
@@ -283,7 +286,7 @@ export function installMainWindowFocusLifecycle(args: {
     resetMarkdownEditorFocus()
     resetTerminalInputFocus()
     resetFloatingTerminalInputFocus()
-    resetShortcutRecorderFocus()
+    resetRendererKeyOwnerFocus()
   })
   rendererWebContents.on('did-finish-load', () => {
     rendererProcessGone = false
@@ -297,13 +300,14 @@ export function installMainWindowFocusLifecycle(args: {
     resetMarkdownEditorFocus()
     resetTerminalInputFocus()
     resetFloatingTerminalInputFocus()
-    resetShortcutRecorderFocus()
+    resetRendererKeyOwnerFocus()
     clearRendererRecoveryTimer()
     recoveryReloadWatchdog.clear()
     ipcMain.removeListener(markdownFocusChannel, onMarkdownEditorFocused)
     ipcMain.removeListener(terminalInputFocusChannel, onTerminalInputFocused)
     ipcMain.removeListener(floatingFocusChannel, onFloatingFocus)
-    ipcMain.removeListener(shortcutRecorderFocusChannel, onShortcutRecorderFocused)
+    shortcutRecorderFocus.dispose()
+    vimNormalModeFocus.dispose()
     ipcMain.removeListener(richMarkdownContextMenuTargetChannel, onRichMarkdownContextMenuTarget)
     ipcMain.removeListener(plainTextContextMenuTargetChannel, onPlainTextContextMenuTarget)
   }
@@ -313,8 +317,9 @@ export function installMainWindowFocusLifecycle(args: {
     isFloatingTerminalInputFocused: () => floatingTerminalInputFocused,
     isMarkdownEditorFocused: () => markdownEditorFocused,
     isRendererProcessGone: () => rendererProcessGone,
-    isShortcutRecorderFocused: () => shortcutRecorderFocused,
+    isShortcutRecorderFocused: shortcutRecorderFocus.get,
     isTerminalInputFocused: () => terminalInputFocused,
+    isVimNormalModeFocused: vimNormalModeFocus.get,
     notifySystemResume: recoveryReloadWatchdog.notifySystemResume
   }
 }

@@ -24,6 +24,7 @@ import {
   textInputOwnsComposition,
   type TextShortcutInput
 } from '../../../shared/keybindings/text-input-shortcut-policy'
+import { vimPriorityCtrlLetter } from '../../../shared/editor/keybindings/vim-priority-ctrl-chords'
 
 export function installMainWindowShortcutRouting(args: {
   focus: MainWindowFocusLifecycle
@@ -210,6 +211,15 @@ export function installMainWindowShortcutRouting(args: {
       !input.shift &&
       (process.platform === 'darwin' ? !input.control : !input.meta) &&
       modForMarkdown
+    ) {
+      return
+    }
+
+    // Vim normal mode claims its Ctrl chords in the renderer; Mod is Cmd on macOS, so no clash there.
+    if (
+      process.platform !== 'darwin' &&
+      focus.isVimNormalModeFocused() &&
+      vimPriorityCtrlLetter(input)
     ) {
       return
     }

@@ -285,6 +285,7 @@ export function createWebUiApi(): NonNullable<Partial<PreloadApi>['ui']> {
     setTerminalInputFocused: () => {},
     setFloatingFocus: () => {},
     setShortcutRecorderFocused: () => {},
+    setVimNormalModeFocused: () => {},
     onRichMarkdownContextCommand: () => noopUnsubscribe,
     onFullscreenChanged: () => noopUnsubscribe,
     minimize: () => {},

@@ -69,7 +69,8 @@ export const getGeneralEditorSearchDescriptors = createLocalizedCatalog(() => [
           aliases: ['keybindings', 'keymap', 'modal', 'motions']
         }
       ),
-      ...translateSearchKeyword('auto.components.settings.general.search.e1ee631696', 'editor')
+      ...translateSearchKeyword('auto.components.settings.general.search.e1ee631696', 'editor'),
+      ...translateSearchKeyword('auto.components.settings.general.search.3ca5ab78a5', 'code')
     ]
   }),
   generalSetting(GENERAL_SETTING_ANCHORS.collapseUnchanged, {
