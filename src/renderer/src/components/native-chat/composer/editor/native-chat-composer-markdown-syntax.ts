@@ -10,6 +10,7 @@ export type NativeChatMarkdownBlock =
 
 export type NativeChatMarkdownSpanKind =
   | 'marker'
+  | 'code-marker'
   | 'bold'
   | 'italic'
   | 'strike'
@@ -44,6 +45,29 @@ export function classifyNativeChatMarkdown(lines: readonly string[]): NativeChat
     previousIsText = result.line.block.kind === 'text' && line.trim() !== ''
     return result.line
   })
+}
+
+/** Line indexes of each fenced block's fences; `close` is null while it runs to the end. */
+export function nativeChatMarkdownFenceBlocks(
+  lines: readonly NativeChatMarkdownLine[]
+): { open: number; close: number | null }[] {
+  const blocks: { open: number; close: number | null }[] = []
+  let open: number | null = null
+  lines.forEach((line, index) => {
+    if (line.block.kind !== 'fence') {
+      return
+    }
+    if (open === null) {
+      open = index
+    } else {
+      blocks.push({ open, close: index })
+      open = null
+    }
+  })
+  if (open !== null) {
+    blocks.push({ open, close: null })
+  }
+  return blocks
 }
 
 function classifyLine(
@@ -165,9 +189,9 @@ function inline(line: string, start: number): NativeChatMarkdownSpan[] {
         continue
       }
       spans.push(
-        { from: index, to: index + tick, kind: 'marker' },
+        { from: index, to: index + tick, kind: 'code-marker' },
         { from: index + tick, to: close, kind: 'code' },
-        { from: close, to: close + tick, kind: 'marker' }
+        { from: close, to: close + tick, kind: 'code-marker' }
       )
       text = mask(text, index, close + tick)
       index = close + tick

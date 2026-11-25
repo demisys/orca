@@ -22,7 +22,8 @@
 
 .native-chat-md-code {
   font-family: var(--font-mono);
-  border-radius: var(--radius-sm, 0.375rem);
+  border-radius: var(--radius-sm);
+  padding-inline: 0.2em;
   background: var(--chat-inline-code-surface);
   color: var(--chat-inline-code-foreground, var(--chat-code-foreground));
 }
@@ -67,4 +68,22 @@
 .native-chat-md-rule {
   border-bottom: 1px solid var(--chat-code-border);
   color: var(--chat-foreground-faint);
+}
+
+/* A code block's first and last visible lines round its box. */
+.native-chat-md-block-start {
+  border-top-left-radius: var(--radius-sm);
+  border-top-right-radius: var(--radius-sm);
+  padding-top: 0.25rem;
+}
+
+.native-chat-md-block-end {
+  border-bottom-left-radius: var(--radius-sm);
+  border-bottom-right-radius: var(--radius-sm);
+  padding-bottom: 0.25rem;
+}
+
+/* Code backticks and fences while the caret is elsewhere; the text itself is unchanged. */
+.native-chat-md-hidden {
+  display: none;
 }

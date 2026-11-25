@@ -6,6 +6,7 @@ import { nativeChatPromptPills } from './native-chat-prompt-document'
 import { NativeChatSideChat } from './native-chat-side-chat-node'
 import { NativeChatUnkernedRunDecorations } from './native-chat-unkerned-run-decorations'
 import { NativeChatComposerMarkdownStyling } from './native-chat-composer-markdown-styling'
+import { NativeChatComposerCodeFenceAutoclose } from './native-chat-composer-code-fence-autoclose'
 import { NativeChatHardBreakParagraphs } from './native-chat-hard-break-paragraphs'
 
 /** The composer's plain-text schema (markdown is styled by decoration, never converted): paragraphs, hard breaks and the pills only Orca inserts. */
@@ -37,6 +38,7 @@ export function nativeChatPromptExtensions(): Extensions {
     }),
     NativeChatUnkernedRunDecorations,
     NativeChatComposerMarkdownStyling,
+    NativeChatComposerCodeFenceAutoclose,
     NativeChatHardBreakParagraphs
   ]
 }
