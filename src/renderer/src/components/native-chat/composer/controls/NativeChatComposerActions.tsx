@@ -22,6 +22,7 @@ import { NativeChatComposerPermissionPicker } from '../../session/options/contro
 import { NativeChatComposerGoalChip } from './NativeChatComposerGoalChip'
 import { NativeChatComposerPrimaryButton } from './NativeChatComposerPrimaryButton'
 import { NativeChatAttachButton } from './NativeChatAttachButton'
+import { NativeChatComposeButton } from '../compose-drawer/NativeChatComposeButton'
 import { NativeChatDictationButton } from './NativeChatDictationButton'
 import { NativeChatContextUsageRing } from '../../usage/NativeChatContextUsageRing'
 import type { NativeChatContextUsageSummary } from '../../../../../../shared/native-chat/native-chat-context-usage-summary'
@@ -47,6 +48,8 @@ export type NativeChatComposerActionsProps = {
   isDictating: boolean
   isDictationHoldMode: boolean
   onAttach: () => void
+  /** Opens the compose drawer; absent where the composer has none. */
+  onCompose?: () => void
   onDictationToggle: () => void
   onDictationHoldStart: () => void
   onDictationHoldEnd: () => void
@@ -84,6 +87,7 @@ export const NativeChatComposerActions = memo(function NativeChatComposerActions
   isDictating,
   isDictationHoldMode,
   onAttach,
+  onCompose,
   onDictationToggle,
   onDictationHoldStart,
   onDictationHoldEnd,
@@ -197,6 +201,15 @@ export const NativeChatComposerActions = memo(function NativeChatComposerActions
 
   const left: NativeChatComposerControl[] = [
     { id: 'attach', priority: 6, content: attach },
+    ...(onCompose
+      ? [
+          {
+            id: 'compose',
+            priority: 3,
+            content: <NativeChatComposeButton onCompose={onCompose} />
+          }
+        ]
+      : []),
     ...(roomReplies ? [{ id: 'room-replies', priority: 6, content: roomReplies }] : []),
     {
       id: 'permissions',

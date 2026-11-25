@@ -1,11 +1,12 @@
 import { NativeChatPromptEditor } from './NativeChatPromptEditor'
 import { notifyNativeChatComposerState } from '../focus/native-chat-composer-mount'
 import type { NativeChatComposerInput } from './native-chat-composer-input'
-import { useCallback, useLayoutEffect, useMemo, useRef } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { cn } from '@/lib/class-names'
 import { NativeChatComposerMenus } from '../pickers/NativeChatComposerMenus'
 import { NativeChatComposerActions } from '../controls/NativeChatComposerActions'
+import { NativeChatComposeDrawer } from '../compose-drawer/NativeChatComposeDrawer'
 import { NativeChatComposerNotices } from '../controls/NativeChatComposerNotices'
 import { NativeChatImageAttachmentPreview } from '../../attachments/chips/NativeChatImageAttachmentPreview'
 
@@ -184,6 +185,7 @@ export function NativeChatComposerField({
 
   // Stable so the memoized option pickers keep their identity.
   const focusComposer = useCallback(() => textareaRef.current?.focus(), [textareaRef])
+  const [composing, setComposing] = useState(false)
   // A launch prompt sits in a popover, so it takes the app's surface instead of the chat's.
   const launch = launchPrompt !== undefined
   const card = useRef<HTMLDivElement>(null)
@@ -326,6 +328,7 @@ export function NativeChatComposerField({
                 isDictating={isDictating}
                 isDictationHoldMode={isDictationHoldMode}
                 onAttach={attach}
+                onCompose={editSession || disabled ? undefined : () => setComposing(true)}
                 onDictationToggle={dictationToggle}
                 onDictationHoldStart={dictationHoldStart}
                 onDictationHoldEnd={dictationHoldEnd}
@@ -345,6 +348,11 @@ export function NativeChatComposerField({
             </div>
           </div>
           {workspaceFooter}
+          <NativeChatComposeDrawer
+            open={composing}
+            onOpenChange={setComposing}
+            inputRef={textareaRef}
+          />
         </div>
       </div>
     </div>
