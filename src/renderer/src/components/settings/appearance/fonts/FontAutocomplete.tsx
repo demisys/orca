@@ -1,33 +1,17 @@
 import type React from 'react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Check, ChevronsUpDown, CircleX } from 'lucide-react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { Input } from '../../../ui/input'
 import { Popover, PopoverAnchor, PopoverContent } from '../../../ui/popover'
 import { ScrollArea } from '../../../ui/scroll-area'
-import { filterFontSuggestions, getRenderedFontSuggestions } from './font-suggestion-filter'
+import { filterFontSuggestions } from './font-suggestion-filter'
 import { useInstalledFontsUnavailable } from './installed-font-list'
 import { useTranslate } from '@/i18n/use-translate'
-import { buildAppFontFamily } from '@/app-shell/appearance/app-font-family'
 
-// Why: these OS-shipped fonts draw pictographs or Greek for Latin letters, so their own name would be unreadable.
-const SYMBOL_FONT_FAMILIES = new Set([
-  'webdings',
-  'wingdings',
-  'wingdings 2',
-  'wingdings 3',
-  'marlett',
-  'symbol',
-  'mt extra',
-  'bookshelf symbol 7',
-  'd050000l',
-  'standard symbols ps'
-])
-
-function fontPreviewStyle(font: string): React.CSSProperties | undefined {
-  return font && !SYMBOL_FONT_FAMILIES.has(font.toLowerCase())
-    ? { fontFamily: buildAppFontFamily(font) }
-    : undefined
-}
+// text-sm 20px line height + 16px vertical padding.
+const FONT_OPTION_ROW_HEIGHT = 36
+const FONT_LIST_PADDING = 4
 
 type FontAutocompleteProps = {
   value: string
@@ -65,6 +49,7 @@ export function FontAutocomplete({
   const rootRef = useRef<HTMLDivElement | null>(null)
   const lastCommittedValueRef = useRef(value)
   const previewFontFamilyRef = useRef(onPreviewFontFamily)
+  const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null)
   const listboxId = useId()
   const installedFontsUnavailable = useInstalledFontsUnavailable()
 
@@ -127,10 +112,14 @@ export function FontAutocomplete({
   // Opening with the committed font must still show all fonts rather than filter by its name.
   const visibleSuggestions =
     !isFilteringQuery && normalizedQuery === normalizedValue ? allSuggestions : filteredSuggestions
-  const renderedSuggestions = useMemo(
-    () => getRenderedFontSuggestions(visibleSuggestions, highlightedIndex),
-    [visibleSuggestions, highlightedIndex]
-  )
+  const virtualizer = useVirtualizer({
+    count: visibleSuggestions.length,
+    getScrollElement: () => scrollEl,
+    estimateSize: () => FONT_OPTION_ROW_HEIGHT,
+    paddingStart: FONT_LIST_PADDING,
+    paddingEnd: FONT_LIST_PADDING,
+    overscan: 8
+  })
 
   // Reconcile highlights before paint so opening/filter changes cannot flash a stale index.
   const [prevVisibleSuggestions, setPrevVisibleSuggestions] = useState(visibleSuggestions)
@@ -151,6 +140,12 @@ export function FontAutocomplete({
       setHighlightedIndex(Math.max(selectedIndex, 0))
     }
   }
+
+  useEffect(() => {
+    if (scrollEl && highlightedIndex >= 0 && highlightedIndex < visibleSuggestions.length) {
+      virtualizer.scrollToIndex(highlightedIndex, { align: 'auto' })
+    }
+  }, [scrollEl, highlightedIndex, visibleSuggestions, virtualizer])
 
   // Preview the highlight; closing or leaving options restores the committed font.
   useEffect(() => {
@@ -349,49 +344,55 @@ export function FontAutocomplete({
           }}
         >
           <ScrollArea
-            className={renderedSuggestions.length > 8 ? 'h-64' : undefined}
+            className={visibleSuggestions.length > 8 ? 'h-64' : undefined}
             style={popoverAvailableHeightStyle}
+            viewportRef={setScrollEl}
             viewportProps={{ style: popoverAvailableHeightStyle }}
           >
-            <div id={listboxId} role="listbox" className="p-1">
-              {visibleSuggestions.length > 0 ? (
-                renderedSuggestions.map(({ font, sourceIndex }) => (
-                  <button
-                    key={font}
-                    type="button"
-                    id={`${listboxId}-option-${sourceIndex}`}
-                    role="option"
-                    aria-selected={sourceIndex === highlightedIndex}
-                    ref={(element) => {
-                      if (element && sourceIndex === highlightedIndex) {
-                        element.scrollIntoView({ block: 'nearest' })
-                      }
-                    }}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onMouseEnter={() => setHighlightedIndex(sourceIndex)}
-                    onClick={() => commitValue(font)}
-                    // Why content-visibility: each row loads its own font, so skip offscreen rows until scrolled to; 20px is the line height inside py-2.
-                    className={`flex w-full items-center justify-between rounded-sm px-3 py-2 text-left text-sm transition-colors [contain-intrinsic-size:auto_20px] [content-visibility:auto] ${
-                      sourceIndex === highlightedIndex
-                        ? 'bg-accent text-accent-foreground'
-                        : 'hover:bg-muted/60'
-                    }`}
-                  >
-                    <span className="truncate" style={fontPreviewStyle(font)}>
-                      {font || defaultOptionLabel}
-                    </span>
-                    {font === value ? <Check className="ml-3 size-4 shrink-0" /> : null}
-                  </button>
-                ))
-              ) : (
-                <div className="px-3 py-3 text-sm text-muted-foreground">
-                  {t(
-                    'auto.components.settings.SettingsFormControls.42a4d15a30',
-                    'No matching fonts.'
-                  )}
-                </div>
-              )}
-            </div>
+            {visibleSuggestions.length > 0 ? (
+              <div
+                id={listboxId}
+                role="listbox"
+                className="relative w-full"
+                style={{ height: `${virtualizer.getTotalSize()}px` }}
+              >
+                {virtualizer.getVirtualItems().map((virtualItem) => {
+                  const sourceIndex = virtualItem.index
+                  const font = visibleSuggestions[sourceIndex] ?? ''
+                  return (
+                    <button
+                      key={virtualItem.key}
+                      type="button"
+                      id={`${listboxId}-option-${sourceIndex}`}
+                      role="option"
+                      aria-selected={sourceIndex === highlightedIndex}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onMouseEnter={() => setHighlightedIndex(sourceIndex)}
+                      onClick={() => commitValue(font)}
+                      className={`absolute top-0 left-1 flex w-[calc(100%-0.5rem)] items-center justify-between rounded-sm px-3 text-left text-sm transition-colors ${
+                        sourceIndex === highlightedIndex
+                          ? 'bg-accent text-accent-foreground'
+                          : 'hover:bg-muted/60'
+                      }`}
+                      style={{
+                        height: `${virtualItem.size}px`,
+                        transform: `translateY(${virtualItem.start}px)`
+                      }}
+                    >
+                      <span className="truncate">{font || defaultOptionLabel}</span>
+                      {font === value ? <Check className="ml-3 size-4 shrink-0" /> : null}
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              <div id={listboxId} role="listbox" className="p-4 text-sm text-muted-foreground">
+                {t(
+                  'auto.components.settings.SettingsFormControls.42a4d15a30',
+                  'No matching fonts.'
+                )}
+              </div>
+            )}
           </ScrollArea>
           {installedFontsUnavailable ? (
             <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">

@@ -1,12 +1,5 @@
 import { normalizeSettingsFormOptionQuery } from '../../form-controls/settings-form-option-filter'
 
-export const FONT_SUGGESTION_RENDER_LIMIT = 320
-
-export type RenderedFontSuggestion = {
-  font: string
-  sourceIndex: number
-}
-
 export function filterFontSuggestions(
   suggestions: readonly string[],
   query: string,
@@ -31,21 +24,4 @@ export function filterFontSuggestions(
     }
   }
   return [...startsWith, ...includes]
-}
-
-export function getRenderedFontSuggestions(
-  suggestions: readonly string[],
-  highlightedIndex: number,
-  limit = FONT_SUGGESTION_RENDER_LIMIT
-): RenderedFontSuggestion[] {
-  const cappedLength = Math.min(suggestions.length, limit)
-  if (cappedLength <= 0) {
-    return []
-  }
-
-  const sourceIndexes = Array.from({ length: cappedLength }, (_value, index) => index)
-  if (highlightedIndex >= cappedLength && highlightedIndex < suggestions.length) {
-    sourceIndexes[cappedLength - 1] = highlightedIndex
-  }
-  return sourceIndexes.map((sourceIndex) => ({ font: suggestions[sourceIndex] ?? '', sourceIndex }))
 }
