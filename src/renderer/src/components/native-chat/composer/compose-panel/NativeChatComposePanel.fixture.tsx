@@ -3,7 +3,11 @@ import type { Editor } from '@tiptap/core'
 import { defineFixture } from '../../../../component-fixtures/component-fixture'
 import type { NativeChatComposerInput } from '../editor/native-chat-composer-input'
 import { NativeChatPromptEditor } from '../editor/NativeChatPromptEditor'
-import { NativeChatComposePanel } from './NativeChatComposePanel'
+import {
+  NativeChatComposePanel,
+  nativeChatComposeTarget,
+  type NativeChatComposeTarget
+} from './NativeChatComposePanel'
 import { NativeChatComposeButton } from './NativeChatComposeButton'
 
 const DRAFTED = [
@@ -25,21 +29,25 @@ const DRAFTED = [
 
 function Composer({ initiallyOpen = true }: { initiallyOpen?: boolean }): React.JSX.Element {
   const inputRef = useRef<NativeChatComposerInput>(null)
-  const [open, setOpen] = useState(initiallyOpen)
+  const [target, setTarget] = useState<NativeChatComposeTarget | null>(
+    initiallyOpen ? { kind: 'end' } : null
+  )
   return (
     <div className="native-chat-appearance p-4">
-      <NativeChatComposePanel open={open} onOpenChange={setOpen} inputRef={inputRef} />
+      <NativeChatComposePanel target={target} onClose={() => setTarget(null)} inputRef={inputRef} />
       <div className="rounded-xl border border-chat-composer-border bg-chat-composer-surface p-1.5 shadow-xs">
         <NativeChatPromptEditor
           inputRef={inputRef}
-          initialValue="Please do this:"
+          initialValue={'Please do this: rename `__init__` loaders, then\n1) run tests\n2) report'}
           disabled={false}
           placeholder="Ask anything"
           onChange={() => {}}
           onSelect={() => {}}
           className="min-h-14 w-full bg-transparent px-2 py-1 text-sm text-foreground outline-none"
         />
-        <NativeChatComposeButton onCompose={() => setOpen((value) => !value)} />
+        <NativeChatComposeButton
+          onCompose={() => setTarget(target ? null : nativeChatComposeTarget(inputRef.current))}
+        />
       </div>
     </div>
   )

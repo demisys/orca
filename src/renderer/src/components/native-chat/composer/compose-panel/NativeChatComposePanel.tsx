@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import {
   EditorContent,
   useEditor,
@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { LinearIssueMarkdownToolbar } from '@/components/task-page/linear/issue-workspace/LinearIssueMarkdownToolbar'
 import { createRichMarkdownEditorCodec } from '@/components/editor/rich-markdown/document/rich-markdown-source-transport'
+import { encodeRawMarkdownHtmlForRichEditor } from '@/components/editor/rich-markdown/raw-source/raw-markdown-html'
 import {
   getScreenSubmitShortcutLabel,
   isScreenSubmitShortcut
@@ -23,18 +24,64 @@ import type { NativeChatComposerInput } from '../editor/native-chat-composer-inp
 import { createNativeChatComposePanelExtensions } from './native-chat-compose-panel-extensions'
 import './native-chat-compose-panel.css'
 
-/** Puts the drafted Markdown on lines of its own: at the caret the user left, else after the draft. */
+/** Where Insert puts the panel's Markdown, decided when the panel opens. */
+export type NativeChatComposeTarget =
+  | { kind: 'caret' }
+  | { kind: 'end' }
+  | { kind: 'selection'; from: number; to: number; original: string }
+
+/** A highlighted range is edited in the panel; a composer the user was not typing in shows its caret
+ *  at the start, so a new draft goes after its text instead. */
+export function nativeChatComposeTarget(
+  input: NativeChatComposerInput | null
+): NativeChatComposeTarget {
+  const from = input?.selectionStart ?? 0
+  const to = input?.selectionEnd ?? 0
+  if (input && to > from) {
+    return { kind: 'selection', from, to, original: input.value.slice(from, to) }
+  }
+  return input?.contains?.(document.activeElement) ? { kind: 'caret' } : { kind: 'end' }
+}
+
+// A line starting one of these blocks has to start its own line in the composer too.
+const BLOCK_START = /^(?:#{1,6}\s|>|[-*+]\s|\d{1,9}[.)]\s|```|~~~)/
+
+function selectTarget(input: NativeChatComposerInput, target: NativeChatComposeTarget): boolean {
+  if (target.kind === 'selection') {
+    // The composer may have changed while the panel was open; follow the selected text if it moved.
+    const from =
+      input.value.slice(target.from, target.to) === target.original
+        ? target.from
+        : input.value.indexOf(target.original)
+    if (from !== -1) {
+      input.setSelectionRange(from, from + target.original.length)
+      return true
+    }
+  }
+  if (target.kind !== 'caret') {
+    input.setSelectionRange(input.value.length, input.value.length)
+  }
+  return false
+}
+
+/** Puts the panel's Markdown in the composer: over the edited selection (inline when it stays one
+ *  line of text), else on lines of its own at the caret or after the draft. */
 function insertIntoComposer(
   input: NativeChatComposerInput | null,
   markdown: string,
-  atCaret: boolean
+  target: NativeChatComposeTarget
 ): void {
   const text = markdown.trim()
   if (!input?.insertText || input.disabled || !text) {
     return
   }
-  if (!atCaret) {
-    input.setSelectionRange(input.value.length, input.value.length)
+  const replacing = selectTarget(input, target)
+  if (replacing && target.kind === 'selection' && !text.includes('\n') && !BLOCK_START.test(text)) {
+    // Keep the spaces the selection had around its words.
+    const lead = /^\s*/.exec(target.original)?.[0] ?? ''
+    const trail = /\s*$/.exec(target.original)?.[0] ?? ''
+    input.insertText(`${lead}${text}${trail}`)
+    return
   }
   const before = input.value.slice(0, input.selectionStart ?? input.value.length)
   const after = input.value.slice(input.selectionEnd ?? input.value.length)
@@ -54,20 +101,22 @@ function NativeChatComposePanelEditor({
   onInsert,
   onClose
 }: {
-  initialContent: JSONContent | null
+  /** A saved draft's document, or composer text (Markdown) to edit. */
+  initialContent: JSONContent | string | null
   onChange: (content: JSONContent | null) => void
-  onInsert: (markdown: string) => void
+  /** `unchanged` when the document is still what the panel opened with. */
+  onInsert: (markdown: string, unchanged: boolean) => void
   onClose: () => void
 }): React.JSX.Element {
   const t = useTranslate()
   const spellcheck = useAppStore((s) => s.settings?.nativeChatComposerSpellcheck !== false)
-  const extensions = useMemo(
-    () => createNativeChatComposePanelExtensions(createRichMarkdownEditorCodec()),
-    []
-  )
+  const codec = useMemo(() => createRichMarkdownEditorCodec(), [])
+  const extensions = useMemo(() => createNativeChatComposePanelExtensions(codec), [codec])
+  // What the editor opened with, so inserting an untouched edit can leave the composer text alone.
+  const openedWith = useRef<string | null>(null)
   const insert = useLatestHandler((target: Editor | null) => {
     if (target && !target.isEmpty) {
-      onInsert(target.getMarkdown())
+      onInsert(target.getMarkdown(), JSON.stringify(target.getJSON()) === openedWith.current)
     }
   })
   const close = useLatestHandler(onClose)
@@ -77,7 +126,14 @@ function NativeChatComposePanelEditor({
     {
       immediatelyRender: false,
       extensions,
-      ...(initialContent ? { content: initialContent } : {}),
+      ...(typeof initialContent === 'string'
+        ? {
+            content: encodeRawMarkdownHtmlForRichEditor(initialContent, codec),
+            contentType: 'markdown' as const
+          }
+        : initialContent
+          ? { content: initialContent }
+          : {}),
       autofocus: 'end',
       editorProps: {
         attributes: {
@@ -104,6 +160,9 @@ function NativeChatComposePanelEditor({
           }
           return false
         }
+      },
+      onCreate: ({ editor: created }) => {
+        openedWith.current = JSON.stringify(created.getJSON())
       },
       // The document, not its Markdown, so reopening restores exactly what was written.
       onUpdate: ({ editor: next }) => onChange(next.isEmpty ? null : next.getJSON())
@@ -158,40 +217,39 @@ function NativeChatComposePanelEditor({
   )
 }
 
-/** A rich editor above the composer for a longer prompt; Insert adds its Markdown to the composer. */
+/** A rich editor above the composer for a longer prompt, or for a highlighted part of it; Insert
+ *  puts its Markdown in the composer. Open while `target` is set. */
 export function NativeChatComposePanel({
-  open,
-  onOpenChange,
+  target,
+  onClose,
   inputRef
 }: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  target: NativeChatComposeTarget | null
+  onClose: () => void
   inputRef: RefObject<NativeChatComposerInput | null>
 }): React.JSX.Element | null {
-  // Kept while closed, so Escape or × never loses a draft; Insert clears it.
+  // Kept while closed, so Escape or × never loses a draft; Insert clears it. Editing a selection
+  // sets it aside rather than replacing it.
   const [draft, setDraft] = useState<JSONContent | null>(null)
-  // Why: a composer the user was not typing in shows its caret at the start, so its draft would end up after the insert.
-  const atCaret = useRef(false)
-  // Before the panel's editor takes focus.
-  useLayoutEffect(() => {
-    if (open) {
-      atCaret.current = inputRef.current?.contains?.(document.activeElement) === true
-    }
-  }, [open, inputRef])
-  if (!open) {
+  if (!target) {
     return null
   }
+  const editing = target.kind === 'selection'
   const close = (): void => {
-    onOpenChange(false)
+    onClose()
     inputRef.current?.focus()
   }
   return (
     <NativeChatComposePanelEditor
-      initialContent={draft}
-      onChange={setDraft}
-      onInsert={(markdown) => {
-        insertIntoComposer(inputRef.current, markdown, atCaret.current)
-        setDraft(null)
+      initialContent={editing ? target.original : draft}
+      onChange={editing ? () => {} : setDraft}
+      onInsert={(markdown, unchanged) => {
+        if (!(editing && unchanged)) {
+          insertIntoComposer(inputRef.current, markdown, target)
+        }
+        if (!editing) {
+          setDraft(null)
+        }
         close()
       }}
       onClose={close}

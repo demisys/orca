@@ -6,7 +6,11 @@ import { flushSync } from 'react-dom'
 import { cn } from '@/lib/class-names'
 import { NativeChatComposerMenus } from '../pickers/NativeChatComposerMenus'
 import { NativeChatComposerActions } from '../controls/NativeChatComposerActions'
-import { NativeChatComposePanel } from '../compose-panel/NativeChatComposePanel'
+import {
+  NativeChatComposePanel,
+  nativeChatComposeTarget,
+  type NativeChatComposeTarget
+} from '../compose-panel/NativeChatComposePanel'
 import { NativeChatComposerNotices } from '../controls/NativeChatComposerNotices'
 import { NativeChatImageAttachmentPreview } from '../../attachments/chips/NativeChatImageAttachmentPreview'
 
@@ -185,7 +189,7 @@ export function NativeChatComposerField({
 
   // Stable so the memoized option pickers keep their identity.
   const focusComposer = useCallback(() => textareaRef.current?.focus(), [textareaRef])
-  const [composing, setComposing] = useState(false)
+  const [composeTarget, setComposeTarget] = useState<NativeChatComposeTarget | null>(null)
   // A launch prompt sits in a popover, so it takes the app's surface instead of the chat's.
   const launch = launchPrompt !== undefined
   const card = useRef<HTMLDivElement>(null)
@@ -225,8 +229,8 @@ export function NativeChatComposerField({
             className="mb-1.5"
           />
           <NativeChatComposePanel
-            open={composing}
-            onOpenChange={setComposing}
+            target={composeTarget}
+            onClose={() => setComposeTarget(null)}
             inputRef={textareaRef}
           />
           <div
@@ -334,7 +338,12 @@ export function NativeChatComposerField({
                 isDictationHoldMode={isDictationHoldMode}
                 onAttach={attach}
                 onCompose={
-                  editSession || disabled ? undefined : () => setComposing((open) => !open)
+                  editSession || disabled
+                    ? undefined
+                    : () =>
+                        setComposeTarget(
+                          composeTarget ? null : nativeChatComposeTarget(textareaRef.current)
+                        )
                 }
                 onDictationToggle={dictationToggle}
                 onDictationHoldStart={dictationHoldStart}
