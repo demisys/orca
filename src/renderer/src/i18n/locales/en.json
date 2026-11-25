@@ -23198,7 +23198,8 @@
         "editorLabel": "Prompt draft",
         "close": "Close",
         "insert": "Insert",
-        "title": "Compose prompt"
+        "title": "Compose prompt",
+        "resize": "Resize compose panel"
       }
     },
     "tab": {

@@ -20,6 +20,8 @@ import { isImeOwnedKeyboardEvent } from '@/lib/text-input/ime/ime-composition-ke
 import { useLatestHandler } from '@/lib/use-latest-handler'
 import { useTranslate } from '@/i18n/use-translate'
 import { useAppStore } from '@/store'
+import { useSidebarResize } from '@/hooks/useSidebarResize'
+import { cn } from '@/lib/class-names'
 import type { NativeChatComposerInput } from '../editor/native-chat-composer-input'
 import { createNativeChatComposePanelExtensions } from './native-chat-compose-panel-extensions'
 import './native-chat-compose-panel.css'
@@ -97,10 +99,14 @@ function insertIntoComposer(
 
 function NativeChatComposePanelEditor({
   initialContent,
+  height,
+  onHeightChange,
   onChange,
   onInsert,
   onClose
 }: {
+  height: number
+  onHeightChange: (height: number) => void
   /** A saved draft's document, or composer text (Markdown) to edit. */
   initialContent: JSONContent | string | null
   onChange: (content: JSONContent | null) => void
@@ -147,13 +153,8 @@ function NativeChatComposePanelEditor({
             insert(editorRef.current)
             return true
           }
-          const plainEscape =
-            event.key === 'Escape' &&
-            !event.altKey &&
-            !event.ctrlKey &&
-            !event.metaKey &&
-            !event.shiftKey
-          if (plainEscape && !isImeOwnedKeyboardEvent(event)) {
+          // Ahead of the rich-markdown keymap, which claims Escape before it reaches the panel.
+          if (isPlainEscape(event)) {
             event.preventDefault()
             close()
             return true
@@ -172,15 +173,63 @@ function NativeChatComposePanelEditor({
   useEffect(() => {
     editorRef.current = editor
   }, [editor])
+  const { containerRef, isResizing, onResizeStart } = useSidebarResize<HTMLDivElement>({
+    isOpen: true,
+    width: height,
+    minWidth: COMPOSE_PANEL_MIN_HEIGHT,
+    maxWidth: composePanelMaxHeight(),
+    // Dragging the top edge up makes the panel taller.
+    deltaSign: -1,
+    axis: 'y',
+    measureMaxSize: composePanelMaxHeight,
+    applyRenderedSize: (container, size) => {
+      container.style.height = `${size}px`
+    },
+    setWidth: onHeightChange
+  })
   const empty = useEditorState({ editor, selector: ({ editor: e }) => e?.isEmpty ?? true }) ?? true
   const closeLabel = t('components.native-chat.compose.close', 'Close')
 
   return (
     <div
+      ref={containerRef}
       role="region"
       aria-label={t('components.native-chat.compose.title', 'Compose prompt')}
-      className="native-chat-compose-panel mb-1.5 flex h-80 max-h-[50vh] flex-col overflow-hidden rounded-xl border border-chat-composer-border bg-chat-composer-surface shadow-xs"
+      // Escape from the toolbar or resize handle closes it too; its draft stays.
+      onKeyDown={(event) => {
+        if (isPlainEscape(event) && !event.defaultPrevented) {
+          event.preventDefault()
+          close()
+        }
+      }}
+      className="native-chat-compose-panel relative mb-1.5 flex max-h-[75vh] flex-col overflow-hidden rounded-xl border border-chat-composer-border bg-chat-composer-surface shadow-xs"
     >
+      <div
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label={t('components.native-chat.compose.resize', 'Resize compose panel')}
+        aria-valuenow={height}
+        aria-valuemin={COMPOSE_PANEL_MIN_HEIGHT}
+        tabIndex={0}
+        className="group absolute inset-x-0 top-0 z-10 flex h-1.5 cursor-row-resize justify-center outline-none"
+        onMouseDown={onResizeStart}
+        onKeyDown={(event) => {
+          const step = event.key === 'ArrowUp' ? 16 : event.key === 'ArrowDown' ? -16 : 0
+          if (step) {
+            event.preventDefault()
+            onHeightChange(
+              Math.min(composePanelMaxHeight(), Math.max(COMPOSE_PANEL_MIN_HEIGHT, height + step))
+            )
+          }
+        }}
+      >
+        <div
+          className={cn(
+            'mt-0.5 h-0.5 w-10 rounded-full bg-transparent transition-colors group-hover:bg-ring/50 group-focus-visible:bg-ring',
+            isResizing && 'bg-ring'
+          )}
+        />
+      </div>
       <div className="flex shrink-0 items-center gap-1 border-b border-chat-composer-border pr-1.5 [&>.linear-issue-markdown-toolbar]:min-w-0 [&>.linear-issue-markdown-toolbar]:flex-1 [&>.linear-issue-markdown-toolbar]:border-0 [&>.linear-issue-markdown-toolbar]:bg-transparent">
         <LinearIssueMarkdownToolbar editor={editor} disabled={false} />
         <Tooltip>
@@ -217,6 +266,25 @@ function NativeChatComposePanelEditor({
   )
 }
 
+function isPlainEscape(event: KeyboardEvent | React.KeyboardEvent): boolean {
+  return (
+    event.key === 'Escape' &&
+    !event.altKey &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.shiftKey &&
+    !isImeOwnedKeyboardEvent(event)
+  )
+}
+
+const COMPOSE_PANEL_MIN_HEIGHT = 160
+// The height the last panel was left at, so a panel in another chat opens at the same size.
+let lastComposePanelHeight = 320
+
+function composePanelMaxHeight(): number {
+  return Math.max(COMPOSE_PANEL_MIN_HEIGHT, Math.round(window.innerHeight * 0.75))
+}
+
 /** A rich editor above the composer for a longer prompt, or for a highlighted part of it; Insert
  *  puts its Markdown in the composer. Open while `target` is set. */
 export function NativeChatComposePanel({
@@ -231,6 +299,7 @@ export function NativeChatComposePanel({
   // Kept while closed, so Escape or × never loses a draft; Insert clears it. Editing a selection
   // sets it aside rather than replacing it.
   const [draft, setDraft] = useState<JSONContent | null>(null)
+  const [height, setHeight] = useState(lastComposePanelHeight)
   if (!target) {
     return null
   }
@@ -242,6 +311,11 @@ export function NativeChatComposePanel({
   return (
     <NativeChatComposePanelEditor
       initialContent={editing ? target.original : draft}
+      height={height}
+      onHeightChange={(next) => {
+        lastComposePanelHeight = next
+        setHeight(next)
+      }}
       onChange={editing ? () => {} : setDraft}
       onInsert={(markdown, unchanged) => {
         if (!(editing && unchanged)) {
