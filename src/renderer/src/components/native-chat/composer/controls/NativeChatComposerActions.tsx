@@ -22,7 +22,7 @@ import { NativeChatComposerPermissionPicker } from '../../session/options/contro
 import { NativeChatComposerGoalChip } from './NativeChatComposerGoalChip'
 import { NativeChatComposerPrimaryButton } from './NativeChatComposerPrimaryButton'
 import { NativeChatAttachButton } from './NativeChatAttachButton'
-import { NativeChatComposeButton } from '../compose-drawer/NativeChatComposeButton'
+import { NativeChatComposeButton } from '../compose-panel/NativeChatComposeButton'
 import { NativeChatDictationButton } from './NativeChatDictationButton'
 import { NativeChatContextUsageRing } from '../../usage/NativeChatContextUsageRing'
 import type { NativeChatContextUsageSummary } from '../../../../../../shared/native-chat/native-chat-context-usage-summary'
@@ -48,7 +48,7 @@ export type NativeChatComposerActionsProps = {
   isDictating: boolean
   isDictationHoldMode: boolean
   onAttach: () => void
-  /** Opens the compose drawer; absent where the composer has none. */
+  /** Toggles the compose panel; absent where the composer has none. */
   onCompose?: () => void
   onDictationToggle: () => void
   onDictationHoldStart: () => void

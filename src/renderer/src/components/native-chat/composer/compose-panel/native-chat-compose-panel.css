@@ -1,0 +1,4 @@
+/* Unlayered like rich-markdown-editor.css, whose page-sized padding it replaces in this smaller panel. */
+.native-chat-compose-panel .rich-markdown-editor {
+  padding: 0.5rem 0.75rem 0.75rem;
+}

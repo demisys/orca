@@ -6,7 +6,7 @@ import { flushSync } from 'react-dom'
 import { cn } from '@/lib/class-names'
 import { NativeChatComposerMenus } from '../pickers/NativeChatComposerMenus'
 import { NativeChatComposerActions } from '../controls/NativeChatComposerActions'
-import { NativeChatComposeDrawer } from '../compose-drawer/NativeChatComposeDrawer'
+import { NativeChatComposePanel } from '../compose-panel/NativeChatComposePanel'
 import { NativeChatComposerNotices } from '../controls/NativeChatComposerNotices'
 import { NativeChatImageAttachmentPreview } from '../../attachments/chips/NativeChatImageAttachmentPreview'
 
@@ -224,6 +224,11 @@ export function NativeChatComposerField({
             )}
             className="mb-1.5"
           />
+          <NativeChatComposePanel
+            open={composing}
+            onOpenChange={setComposing}
+            inputRef={textareaRef}
+          />
           <div
             ref={card}
             data-native-chat-dock-pinned={launch ? undefined : ''}
@@ -328,7 +333,9 @@ export function NativeChatComposerField({
                 isDictating={isDictating}
                 isDictationHoldMode={isDictationHoldMode}
                 onAttach={attach}
-                onCompose={editSession || disabled ? undefined : () => setComposing(true)}
+                onCompose={
+                  editSession || disabled ? undefined : () => setComposing((open) => !open)
+                }
                 onDictationToggle={dictationToggle}
                 onDictationHoldStart={dictationHoldStart}
                 onDictationHoldEnd={dictationHoldEnd}
@@ -348,11 +355,6 @@ export function NativeChatComposerField({
             </div>
           </div>
           {workspaceFooter}
-          <NativeChatComposeDrawer
-            open={composing}
-            onOpenChange={setComposing}
-            inputRef={textareaRef}
-          />
         </div>
       </div>
     </div>

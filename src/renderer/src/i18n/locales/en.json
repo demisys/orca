@@ -23196,12 +23196,9 @@
       "compose": {
         "open": "Compose in editor",
         "editorLabel": "Prompt draft",
-        "insertHint": "{{shortcut}} to insert",
         "close": "Close",
         "insert": "Insert",
-        "title": "Compose prompt",
-        "description": "Draft with lists, code blocks and headings. Insert adds it to your message as Markdown.",
-        "placeholder": "Write a longer prompt with lists, code blocks and headings…"
+        "title": "Compose prompt"
       }
     },
     "tab": {
