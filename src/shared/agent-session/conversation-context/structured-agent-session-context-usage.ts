@@ -5,7 +5,8 @@ import {
   type AgentSessionContextUsage,
   type AgentSessionContextUsageCategory,
   type AgentSessionContextUsed,
-  type AgentSessionContextWindow
+  type AgentSessionContextWindow,
+  type AgentSessionPromptCache
 } from './agent-session-context-usage'
 import type { AgentJournalRenderItem } from '../journal/agent-session-journal-types'
 import type { AgentSessionOptionsResult } from '../options/protocol/agent-session-options-result'
@@ -24,6 +25,7 @@ export type StructuredAgentContextUsage = {
   estimated: boolean
   /** The provider's breakdown; empty for an estimate. */
   categories: readonly AgentSessionContextUsageCategory[]
+  promptCache?: AgentSessionPromptCache
 }
 
 type ContextFactSource = Pick<AgentJournalRenderItem, 'sequence' | 'body'>
@@ -35,6 +37,7 @@ export function latestStructuredAgentContextFacts(
 ): AgentSessionContextUsage {
   let used: { sequence: number; fact: AgentSessionContextUsed } | null = null
   let window: { sequence: number; fact: AgentSessionContextWindow } | null = null
+  let promptCache: { sequence: number; fact: AgentSessionPromptCache } | null = null
   for (const item of items) {
     if (isAgentSessionContextClear(item.body) && item.sequence > minimumSequence) {
       minimumSequence = item.sequence
@@ -43,6 +46,9 @@ export function latestStructuredAgentContextFacts(
       }
       if (window && window.sequence <= minimumSequence) {
         window = null
+      }
+      if (promptCache && promptCache.sequence <= minimumSequence) {
+        promptCache = null
       }
     }
     if (item.sequence <= minimumSequence) {
@@ -55,8 +61,15 @@ export function latestStructuredAgentContextFacts(
     if (facts?.window && (window === null || item.sequence >= window.sequence)) {
       window = { sequence: item.sequence, fact: facts.window }
     }
+    if (facts?.promptCache && (promptCache === null || item.sequence >= promptCache.sequence)) {
+      promptCache = { sequence: item.sequence, fact: facts.promptCache }
+    }
   }
-  return { ...(used ? { used: used.fact } : {}), ...(window ? { window: window.fact } : {}) }
+  return {
+    ...(used ? { used: used.fact } : {}),
+    ...(window ? { window: window.fact } : {}),
+    ...(promptCache ? { promptCache: promptCache.fact } : {})
+  }
 }
 
 /** Loaded rows reach the live head and outrank wholeJournal; use the host answer only for missing parts from older rows. */
@@ -91,15 +104,18 @@ export function selectStructuredAgentSessionContextUsage(
 
 function summarizeStructuredAgentContextFacts({
   used: fact,
-  window
+  window,
+  promptCache
 }: AgentSessionContextUsage): StructuredAgentContextUsage | null {
+  const cache = promptCache ? { promptCache } : {}
   if (fact?.kind === 'report') {
     return {
       usedTokens: fact.usedTokens,
       windowTokens: fact.windowTokens,
       percentage: fact.percentage,
       estimated: false,
-      categories: fact.categories
+      categories: fact.categories,
+      ...cache
     }
   }
   // `unknown`, or a kind a newer host writes that this client cannot measure.
@@ -116,6 +132,7 @@ function summarizeStructuredAgentContextFacts({
     windowTokens: window.tokens,
     percentage: Math.round((usedTokens / window.tokens) * 100),
     estimated: true,
-    categories: []
+    categories: [],
+    ...cache
   }
 }

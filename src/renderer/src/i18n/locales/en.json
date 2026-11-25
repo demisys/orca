@@ -22225,7 +22225,14 @@
         "label": "Context {{used}} of {{window}} tokens, {{percent}}% used",
         "title": "Context",
         "estimated": "Estimated from the last response.",
-        "deferredNote": "Loaded on demand. Not counted in the used total."
+        "deferredNote": "Loaded on demand. Not counted in the used total.",
+        "cacheTitle": "Prompt cache",
+        "cacheCold": "Cold",
+        "cacheMinutesLeft": "{{minutes}}m left",
+        "cacheColdNote": "The next message rebuilds the cache, so it costs more.",
+        "cacheExpires": "Expires {{time}} · {{ttl}} TTL",
+        "cacheColdLabel": "prompt cache cold",
+        "cacheWarmLabel": "prompt cache {{minutes}}m left"
       },
       "contextMenu": {
         "copyOrcaSessionId": "Copy Orca Session ID",

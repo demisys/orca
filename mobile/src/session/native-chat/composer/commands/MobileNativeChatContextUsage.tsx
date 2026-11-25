@@ -1,12 +1,14 @@
-import { memo } from 'react'
+import { memo, useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Svg, { Circle } from 'react-native-svg'
 import {
   contextUsageRingReadout,
-  type NativeChatContextUsageSummary
+  type NativeChatContextUsageSummary,
+  type PromptCacheReadout
 } from '../../../../../../src/shared/native-chat/native-chat-context-usage-summary'
+import { createPromptCacheReadoutHook } from '../../../../../../src/shared/native-chat/use-native-chat-prompt-cache-readout'
 import { ListGroup, ListRow, SectionHeader } from '../../../../components/list/ListGroup'
-import { useMobileTranslation } from '../../../../i18n/use-mobile-translation'
+import { useMobileTranslation, useMobileUiLocale } from '../../../../i18n/use-mobile-translation'
 import {
   pressedStyle,
   radii,
@@ -23,6 +25,8 @@ const RING_SIZE = 16
 const RING_STROKE = 2
 const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
+
+const usePromptCacheReadout = createPromptCacheReadoutHook({ useEffect, useState })
 
 export type MobileNativeChatContext = {
   usage: NativeChatContextUsageSummary | null
@@ -117,6 +121,7 @@ export function MobileNativeChatContextSection({
   const styles = useThemedStyles(stylesSheet)
   const colors = useMobileColors()
   const t = useMobileTranslation()
+  const cache = usePromptCacheReadout(usage?.promptCache)
   if (!usage) {
     return null
   }
@@ -141,6 +146,7 @@ export function MobileNativeChatContextSection({
             </View>
           }
         />
+        {cache ? <PromptCacheRow key="cache" cache={cache} /> : null}
         {onCompact ? (
           <ListRow
             key="compact"
@@ -151,6 +157,46 @@ export function MobileNativeChatContextSection({
         ) : null}
       </ListGroup>
     </>
+  )
+}
+
+/** `1h` or `5m`. */
+function formatCacheTtl(ttlSeconds: number): string {
+  return ttlSeconds >= 3600
+    ? `${Math.round(ttlSeconds / 3600)}h`
+    : `${Math.round(ttlSeconds / 60)}m`
+}
+
+function PromptCacheRow({ cache }: { cache: PromptCacheReadout }): React.JSX.Element {
+  const colors = useMobileColors()
+  const t = useMobileTranslation()
+  const locale = useMobileUiLocale()
+  const cold = cache.state === 'cold'
+  return (
+    <ListRow
+      title={t('chat.contextUsage.cacheTitle', 'Prompt cache')}
+      subtitle={
+        cold
+          ? t(
+              'chat.contextUsage.cacheColdNote',
+              'The next message rebuilds the cache, so it costs more.'
+            )
+          : t('chat.contextUsage.cacheExpires', 'Expires {{time}} · {{ttl}} TTL', {
+              time: new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(
+                cache.expiresAt
+              ),
+              ttl: formatCacheTtl(cache.ttlSeconds)
+            })
+      }
+      value={
+        cold
+          ? t('chat.contextUsage.cacheCold', 'Cold')
+          : t('chat.contextUsage.cacheMinutesLeft', '{{minutes}}m left', {
+              minutes: String(cache.minutesLeft)
+            })
+      }
+      valueColor={cache.state === 'expiring' ? colors.statusAmber : undefined}
+    />
   )
 }
 

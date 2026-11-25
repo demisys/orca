@@ -56,8 +56,14 @@ export type AgentSessionContextUsed =
   /** Compaction, a conversation reset or a model change: unknown until a response or report restates it. */
   | { kind: 'unknown'; capturedAt: number }
 
+/** Main-thread prompt cache as of the newest response; cold after compaction, a reset or a model change. */
+export type AgentSessionPromptCache =
+  | { kind: 'warm'; ttlSeconds: number; refreshedAt: number }
+  | { kind: 'cold'; capturedAt: number }
+
 /** Context facts on a turn row. An absent part says nothing. */
 export type AgentSessionContextUsage = {
   window?: AgentSessionContextWindow
   used?: AgentSessionContextUsed
+  promptCache?: AgentSessionPromptCache
 }

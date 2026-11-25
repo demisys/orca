@@ -1,4 +1,5 @@
 import type { StructuredAgentContextUsage } from '../agent-session/conversation-context/structured-agent-session-context-usage'
+import type { AgentSessionPromptCache } from '../agent-session/conversation-context/agent-session-context-usage'
 
 /** Reduce provider context breakdowns to the rows shown by the composer ring. */
 export type NativeChatContextUsageSummary = {
@@ -8,6 +9,7 @@ export type NativeChatContextUsageSummary = {
   estimated: boolean
   /** Largest first, as a share of the window; empty rows are dropped, and deferred rows sit outside the used total. */
   rows: readonly { name: string; tokens: number; percentage: number; deferred?: true }[]
+  promptCache?: AgentSessionPromptCache
 }
 
 /** Past this the window is nearly spent, so the ring turns red to say so. */
@@ -28,6 +30,71 @@ export function contextUsageRingReadout(usage: NativeChatContextUsageSummary): {
   }
 }
 
+/** The last fifth of the TTL; whole minutes for both the 5m and 1h TTLs. */
+const EXPIRING_SHARE = 0.2
+const MINUTE_MS = 60_000
+
+export type PromptCacheReadout =
+  | {
+      state: 'warm' | 'expiring'
+      expiresAt: number
+      ttlSeconds: number
+      /** Rounded up, so the last minute reads 1 rather than 0. */
+      minutesLeft: number
+      /** When `minutesLeft` (and with it `state`) next changes. */
+      nextChangeAt: number
+    }
+  | { state: 'cold' }
+
+export function promptCacheReadout(
+  cache: AgentSessionPromptCache,
+  now: number
+): PromptCacheReadout {
+  if (cache.kind === 'cold') {
+    return { state: 'cold' }
+  }
+  const ttlMs = cache.ttlSeconds * 1000
+  const expiresAt = cache.refreshedAt + ttlMs
+  // Clamped so a host clock ahead of this one never reads past the TTL.
+  const leftMs = Math.min(expiresAt - now, ttlMs)
+  if (leftMs <= 0) {
+    return { state: 'cold' }
+  }
+  const minutesLeft = Math.ceil(leftMs / MINUTE_MS)
+  return {
+    state: leftMs <= ttlMs * EXPIRING_SHARE ? 'expiring' : 'warm',
+    expiresAt,
+    ttlSeconds: cache.ttlSeconds,
+    minutesLeft,
+    nextChangeAt: expiresAt - (minutesLeft - 1) * MINUTE_MS
+  }
+}
+
+/** Twelve dashes tile a ring evenly, so the seam at the top never shows. */
+const COLD_RING_DASH_COUNT = 12
+const COLD_RING_DASH_SHARE = 0.6
+
+/** A cold ring's track: even dashes all the way round. */
+export function coldRingTrackDashes(circumference: number): number[] {
+  const period = circumference / COLD_RING_DASH_COUNT
+  return [period * COLD_RING_DASH_SHARE, period * (1 - COLD_RING_DASH_SHARE)]
+}
+
+/** A cold ring's fill: the track's dashes, cut off at the used share. */
+export function coldRingFillDashes(circumference: number, filled: number): number[] {
+  const period = circumference / COLD_RING_DASH_COUNT
+  const dash = period * COLD_RING_DASH_SHARE
+  const dashes: number[] = []
+  let left = (circumference * filled) / 100
+  while (left > 0) {
+    dashes.push(Math.min(dash, left))
+    left -= period
+    dashes.push(left > 0 ? period - dash : circumference)
+  }
+  // An empty array would draw a solid ring.
+  return dashes.length > 0 ? dashes : [0, circumference]
+}
+
 function rowPercentage(tokens: number, windowTokens: number): number {
   return windowTokens > 0 ? Math.round((tokens / windowTokens) * 1000) / 10 : 0
 }
@@ -40,6 +107,7 @@ export function summarizeContextUsage(
     windowTokens: usage.windowTokens,
     percentage: usage.percentage,
     estimated: usage.estimated,
+    ...(usage.promptCache ? { promptCache: usage.promptCache } : {}),
     rows: usage.categories
       .filter((row) => row.tokens > 0)
       .map((row) => ({

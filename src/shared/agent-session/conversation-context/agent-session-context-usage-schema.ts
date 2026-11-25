@@ -48,10 +48,22 @@ const Used = lazyZodSchema(() =>
   ])
 )
 
+const PromptCache = lazyZodSchema(() =>
+  z.discriminatedUnion('kind', [
+    z.object({
+      kind: z.literal('warm'),
+      ttlSeconds: z.number().finite().positive(),
+      refreshedAt: CapturedAt
+    }),
+    z.object({ kind: z.literal('cold'), capturedAt: CapturedAt })
+  ])
+)
+
 export const AgentSessionContextUsageSchema = lazyZodSchema(() =>
   z.object({
     window: z.object({ tokens: WindowTokens, capturedAt: CapturedAt }).optional(),
-    used: Used.optional()
+    used: Used.optional(),
+    promptCache: PromptCache.optional()
   })
 )
 

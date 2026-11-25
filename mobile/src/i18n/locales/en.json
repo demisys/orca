@@ -3301,7 +3301,12 @@
       "title": "Context",
       "left": "{{percent}}% context left",
       "used": "{{percent}}% used",
-      "compact": "Compact"
+      "compact": "Compact",
+      "cacheTitle": "Prompt cache",
+      "cacheCold": "Cold",
+      "cacheMinutesLeft": "{{minutes}}m left",
+      "cacheColdNote": "The next message rebuilds the cache, so it costs more.",
+      "cacheExpires": "Expires {{time}} · {{ttl}} TTL"
     },
     "composerAttachments": {
       "file": "File",

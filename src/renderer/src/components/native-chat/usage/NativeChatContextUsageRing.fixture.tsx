@@ -30,3 +30,44 @@ export const deferredTools = defineFixture({
     frame.querySelector<HTMLButtonElement>('button[data-native-chat-context-usage]')?.click()
   }
 })
+
+const MINUTE = 60_000
+const cacheUsage = (
+  promptCache: NonNullable<Parameters<typeof summarizeContextUsage>[0]['promptCache']>
+) =>
+  summarizeContextUsage({
+    usedTokens: 120_400,
+    windowTokens: 1_000_000,
+    percentage: 12,
+    estimated: true,
+    categories: [],
+    promptCache
+  })
+
+function cacheFixture(make: () => Parameters<typeof cacheUsage>[0]) {
+  return defineFixture({
+    width: 360,
+    render: () => (
+      <div className="flex h-48 items-end justify-end bg-background p-4">
+        <NativeChatContextUsageRing usage={cacheUsage(make())} />
+      </div>
+    ),
+    interact: (frame) => {
+      frame.querySelector<HTMLButtonElement>('button[data-native-chat-context-usage]')?.click()
+    }
+  })
+}
+
+export const cacheWarm = cacheFixture(() => ({
+  kind: 'warm',
+  ttlSeconds: 3600,
+  refreshedAt: Date.now() - 8 * MINUTE
+}))
+
+export const cacheExpiring = cacheFixture(() => ({
+  kind: 'warm',
+  ttlSeconds: 3600,
+  refreshedAt: Date.now() - 56 * MINUTE
+}))
+
+export const cacheCold = cacheFixture(() => ({ kind: 'cold', capturedAt: Date.now() }))

@@ -43,6 +43,28 @@ export function claudeTokenUsage(value: unknown): AgentSessionTokenUsage | null 
   return total > 0 ? usage : null
 }
 
+const ONE_HOUR_CACHE_SECONDS = 3_600
+/** The API's default prompt-cache TTL. */
+const DEFAULT_CACHE_SECONDS = 300
+
+/** TTL the response wrote, else the one its cache reads refreshed; null when it touched no cache. */
+export function claudePromptCacheTtlSeconds(
+  value: unknown,
+  previousTtlSeconds: number | null
+): number | null {
+  if (!isRecord(value)) {
+    return null
+  }
+  const creation = isRecord(value.cache_creation) ? value.cache_creation : {}
+  if (positiveCount(creation.ephemeral_1h_input_tokens) > 0) {
+    return ONE_HOUR_CACHE_SECONDS
+  }
+  if (positiveCount(value.cache_creation_input_tokens) > 0) {
+    return DEFAULT_CACHE_SECONDS
+  }
+  return positiveCount(value.cache_read_input_tokens) > 0 ? previousTtlSeconds : null
+}
+
 function modelId(value: unknown): string | null {
   const model = typeof value === 'string' ? value.trim() : ''
   return model.length > 0 && model.length <= MAX_CONTEXT_MODEL_ID_CHARS ? model : null

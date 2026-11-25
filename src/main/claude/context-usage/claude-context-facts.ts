@@ -3,7 +3,8 @@ import {
   MAX_CONTEXT_MODEL_ID_CHARS,
   type AgentSessionContextReport,
   type AgentSessionContextUsage,
-  type AgentSessionContextWindow
+  type AgentSessionContextWindow,
+  type AgentSessionPromptCache
 } from '../../../shared/agent-session/conversation-context/agent-session-context-usage'
 import type { AgentJournalItemIdentity } from '../../../shared/agent-session/journal/agent-session-journal-identity'
 import type { StructuredAgentSessionEventSink } from '../../native-chat/agent-session-wire/journal-ingress/structured-agent-session-event-sink'
@@ -11,6 +12,7 @@ import {
   claudeContextResetKind,
   claudeContextWindowFromResult,
   claudeContextWindowHint,
+  claudePromptCacheTtlSeconds,
   claudeTokenUsage,
   type ClaudeMainThreadModel
 } from './claude-context-usage'
@@ -50,6 +52,8 @@ export class ClaudeContextFacts {
   /** Check the journal before seeding a configured window hint. */
   private journalMayLackWindow = true
   private lastResponse: string | null = null
+  /** Cache reads refresh at the TTL they were written with, which only writes reveal. */
+  private promptCacheTtlSeconds: number | null = null
   private readonly requestListeners = new Set<ClaudeContextReportListener>()
   private readonly activityListeners = new Set<() => void>()
 
@@ -120,6 +124,12 @@ export class ClaudeContextFacts {
     if (model) {
       this.mainModel = { ...this.mainModel, responseModel: model }
     }
+    const ttlSeconds = claudePromptCacheTtlSeconds(response?.usage, this.promptCacheTtlSeconds)
+    this.promptCacheTtlSeconds = ttlSeconds ?? this.promptCacheTtlSeconds
+    const cache: { promptCache?: AgentSessionPromptCache } =
+      ttlSeconds === null
+        ? {}
+        : { promptCache: { kind: 'warm', ttlSeconds, refreshedAt: observedAt } }
     const hint: AgentSessionContextWindow | null =
       this.windowHint === null ? null : { tokens: this.windowHint, capturedAt: observedAt }
     let window: AgentSessionContextWindow | undefined
@@ -127,6 +137,7 @@ export class ClaudeContextFacts {
       // After a model change, only a configured hint can serve estimates before the report.
       if (!hint) {
         this.usedCounts += 1
+        this.writeCache(cache)
         return
       }
       window = hint
@@ -134,6 +145,7 @@ export class ClaudeContextFacts {
     } else if (model && this.servedModel !== null && model !== this.servedModel) {
       // Plan approval can switch models mid-turn without a new init.
       this.modelMayHaveChanged(observedAt)
+      this.writeCache(cache)
       return
     }
     this.servedModel = model ?? this.servedModel
@@ -147,7 +159,11 @@ export class ClaudeContextFacts {
       this.journalMayLackWindow = false
     }
     this.write(
-      { used: { kind: 'estimate', usage, capturedAt: observedAt }, ...(window ? { window } : {}) },
+      {
+        used: { kind: 'estimate', usage, capturedAt: observedAt },
+        ...(window ? { window } : {}),
+        ...cache
+      },
       windowIfNoneHeld ?? undefined
     )
   }
@@ -223,10 +239,19 @@ export class ClaudeContextFacts {
     )
   }
 
+  private writeCache(cache: { promptCache?: AgentSessionPromptCache }): void {
+    if (cache.promptCache) {
+      this.write(cache)
+    }
+  }
+
   private forget(observedAt: number, requestReport: boolean): void {
     this.markActivity()
     this.lastResponse = null
-    this.write({ used: { kind: 'unknown', capturedAt: observedAt } })
+    this.write({
+      used: { kind: 'unknown', capturedAt: observedAt },
+      promptCache: { kind: 'cold', capturedAt: observedAt }
+    })
     if (requestReport) {
       this.requestReport(this.turn.identity)
     }

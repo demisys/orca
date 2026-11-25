@@ -61,14 +61,19 @@ const MAX_CONTEXT_PART_BYTES: Record<keyof AgentSessionContextUsage, number> = (
         deferred: true as const
       })),
       capturedAt: number
-    }
+    },
+    promptCache: { kind: 'warm', ttlSeconds: number, refreshedAt: number }
   }
-  return { window: jsonBytes(worst.window), used: jsonBytes(worst.used) }
+  return {
+    window: jsonBytes(worst.window),
+    used: jsonBytes(worst.used),
+    promptCache: jsonBytes(worst.promptCache)
+  }
 })()
 
 /** Bound retained parts conservatively; supplied parts use their actual size. */
 function contextBytesBound(write: AgentSessionContextUsage | undefined): number {
-  const parts: (keyof AgentSessionContextUsage)[] = ['window', 'used']
+  const parts: (keyof AgentSessionContextUsage)[] = ['window', 'used', 'promptCache']
   return parts.reduce(
     (total, part) =>
       total + 32 + (write?.[part] ? jsonBytes(write[part]) : MAX_CONTEXT_PART_BYTES[part]),
