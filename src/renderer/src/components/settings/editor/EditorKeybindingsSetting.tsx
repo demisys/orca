@@ -1,3 +1,4 @@
+import { GENERAL_SETTING_ANCHORS } from '../general/general-setting-anchors'
 import type { GlobalSettings } from '../../../../../shared/settings/global-settings-types'
 import { SearchableSetting } from '../section-layout/SearchableSetting'
 import { Label } from '../../ui/label'
@@ -17,6 +18,7 @@ export function EditorKeybindingsSetting({
   const t = useTranslate()
   return (
     <SearchableSetting
+      id={GENERAL_SETTING_ANCHORS.editorKeybindings}
       title={t(
         'auto.components.settings.EditorKeybindingsSetting.78648745bc',
         'Editor Keybindings'

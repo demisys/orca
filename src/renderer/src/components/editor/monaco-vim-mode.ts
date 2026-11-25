@@ -1,4 +1,6 @@
 import type { editor } from 'monaco-editor'
+import type { initVimMode as InitVimMode, VimAdapterInstance } from 'monaco-vim'
+import { addAppKeyListener, removeAppKeyListener } from '@/lib/keyboard/app-keyboard-router'
 
 // monaco-vim is a keymap emulator, not Neovim. Verified working against the live editor: motions,
 // operators, registers (yank/paste), visual mode, macros (`qa`…`q` / `@a`), and `:%s` substitution.
@@ -6,10 +8,10 @@ import type { editor } from 'monaco-editor'
 // onto Monaco here. Documented monaco-vim quirks (Orca's save/sync are verified clean, so these are
 // the vendored engine's): `gd` and `:%s` live-preview (`inccommand`) are unsupported; Backspace in a
 // recorded macro isn't replayed; and linewise paste of a newline-terminated buffer adds one trailing
-// blank line. See tests/e2e/vim-keybindings-file-editor.spec.ts.
+// blank line. See tests/e2e/editor/vim-keybindings-file-editor.spec.ts.
 export type VimModeController = { dispose: () => void }
 
-/** The focused editor's hooks Ex commands route to: save, close, and the editor for `:set`. */
+/** The hooks an editor's Ex commands route to: save, close, and the editor for `:set`. */
 export type VimEditorActions = {
   /** Persist the buffer; resolves `false` (or rejects) when the save fails, so `:wq` can stay open. */
   onWrite: () => void | Promise<boolean>
@@ -19,19 +21,26 @@ export type VimEditorActions = {
   editor: editor.IStandaloneCodeEditor
 }
 
-// Why: monaco-vim registers Ex commands on a process-global Vim singleton, so `:w`/`:q`/`:set` must
-// route to whichever editor currently holds focus rather than a single captured instance.
-let active: VimEditorActions | null = null
-let exCommandsRegistered = false
-
+type VimEntry = { actions: VimEditorActions; insertMode: boolean }
 type VimExParams = { args?: string[]; argString?: string }
-type VimExApi = {
-  defineEx: (
-    name: string,
-    shorthand: string,
-    handler: (ctx: unknown, params: VimExParams) => void
-  ) => void
+type VimRuntime = {
+  Vim: {
+    defineEx: (
+      name: string,
+      shorthand: string,
+      handler: (cm: VimAdapterInstance, params: VimExParams) => void
+    ) => void
+  }
+  keyMap: { vim?: { call: (key: string, cm: VimAdapterInstance) => unknown } }
 }
+
+// Why: monaco-vim's Ex commands and keymap are process-global, so key everything by the adapter
+// that ran them; a focus change can then never redirect `:w`/`:q` to another split.
+const entries = new Map<VimAdapterInstance, VimEntry>()
+let runtime: VimRuntime | null = null
+
+// Ctrl chords vim relies on that Orca's Mod shortcuts (Ctrl on Linux/Windows) would otherwise take.
+const VIM_PRIORITY_CTRL_KEYS = new Set(['a', 'b', 'd', 'e', 'f', 'i', 'o', 'r', 'u', 'v', 'x', 'y'])
 
 /**
  * Apply one `:set` token (e.g. `nowrap`, `number`, `tabstop=4`) to the Monaco editor. Monaco has no
@@ -83,57 +92,82 @@ function applySetOption(ed: editor.IStandaloneCodeEditor, token: string): void {
   }
 }
 
+function ctrlChordLetter(event: KeyboardEvent): string | null {
+  if (!event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) {
+    return null
+  }
+  const fromCode = /^Key([A-Z])$/.exec(event.code)?.[1]?.toLowerCase()
+  const letter = /^[a-z]$/i.test(event.key) ? event.key.toLowerCase() : fromCode
+  return letter && VIM_PRIORITY_CTRL_KEYS.has(letter) ? letter : null
+}
+
+// Runs ahead of app shortcuts: a vim chord in normal/visual mode wins; insert mode keeps app shortcuts.
+function claimVimCtrlChord(event: KeyboardEvent): void {
+  if (event.defaultPrevented || event.isComposing || !runtime) {
+    return
+  }
+  const letter = ctrlChordLetter(event)
+  if (!letter) {
+    return
+  }
+  for (const [adapter, entry] of entries) {
+    if (!entry.actions.editor.hasTextFocus() || entry.insertMode) {
+      continue
+    }
+    const command = runtime.keyMap.vim?.call(`Ctrl-${letter}`, adapter)
+    if (!command) {
+      return
+    }
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    if (typeof command === 'function') {
+      command()
+    }
+    return
+  }
+}
+
 /** Register `:w`/`:q`/`:q!`/`:wq`/`:x`/`:set` once on monaco-vim's process-global Vim singleton. */
-function ensureExCommands(vimMode: unknown): void {
-  if (exCommandsRegistered) {
-    return
-  }
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: monaco-vim 0.4.4 attaches its Vim engine (carrying defineEx) as a runtime-only `.Vim` property on the exported adapter, absent from the package's published types; the `if (!vimApi)` guard below tolerates its absence.
-  const vimApi = (vimMode as { Vim?: VimExApi }).Vim
-  if (!vimApi) {
-    return
-  }
-  exCommandsRegistered = true
+function defineExCommands(vim: VimRuntime['Vim']): void {
   // Why: defer close so monaco-vim finishes dispatching the Ex command before the editor (and this
-  // adapter) unmounts; capture the invoking editor so a focus change in the same tick can't
-  // redirect the close to another editor.
-  const closeNow = (): void => {
-    const target = active
-    queueMicrotask(() => target?.onClose())
+  // adapter) unmounts.
+  const closeNow = (entry: VimEntry | undefined): void => {
+    queueMicrotask(() => entry?.actions.onClose())
   }
   // Why: close only after the save resolves — Orca's save is async, so closing immediately would
   // tear the model down mid-write and drop the file. A failed or rejected write keeps the buffer open.
-  const writeThenClose = (): void => {
-    const target = active
-    if (!target) {
+  const writeThenClose = (cm: VimAdapterInstance): void => {
+    const entry = entries.get(cm)
+    if (!entry) {
       return
     }
     void (async () => {
       try {
-        if ((await target.onWrite()) === false) {
+        if ((await entry.actions.onWrite()) === false) {
           return
         }
       } catch {
         return
       }
-      target.onClose()
+      entry.actions.onClose()
     })()
   }
-  vimApi.defineEx('write', 'w', () => active?.onWrite())
+  vim.defineEx('write', 'w', (cm) => entries.get(cm)?.actions.onWrite())
   // Why: `:q` refuses to close a buffer with unsaved edits (Orca does not autosave, so closing would
   // drop them); `:q!` forces the close. monaco-vim leaves the trailing `!` in `argString`.
-  vimApi.defineEx('quit', 'q', (_ctx, params) => {
+  vim.defineEx('quit', 'q', (cm, params) => {
+    const entry = entries.get(cm)
     const forced = (params.argString ?? '').trim().startsWith('!')
-    if (!forced && active?.isDirty()) {
+    if (!forced && entry?.actions.isDirty()) {
       // Thrown so monaco-vim surfaces it on the Vim status line, mirroring Vim's E37.
       throw new Error('No write since last change (add ! to override)')
     }
-    closeNow()
+    closeNow(entry)
   })
-  vimApi.defineEx('wq', 'wq', writeThenClose)
-  vimApi.defineEx('xit', 'x', writeThenClose)
-  vimApi.defineEx('set', 'se', (_ctx, params) => {
-    const ed = active?.editor
+  vim.defineEx('wq', 'wq', writeThenClose)
+  vim.defineEx('xit', 'x', writeThenClose)
+  vim.defineEx('set', 'se', (cm, params) => {
+    const ed = entries.get(cm)?.actions.editor
     if (!ed) {
       return
     }
@@ -146,31 +180,38 @@ function ensureExCommands(vimMode: unknown): void {
   })
 }
 
+async function loadVimMode(): Promise<typeof InitVimMode> {
+  const { initVimMode, VimMode } = await import('monaco-vim')
+  if (!runtime) {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: monaco-vim 0.4.4 attaches CodeMirror's Vim API and vim keymap to the exported adapter class at import; its published types omit them.
+    runtime = VimMode as unknown as VimRuntime
+    defineExCommands(runtime.Vim)
+  }
+  return initVimMode
+}
+
 /**
  * Enable Vim keybindings on a Monaco editor, writing mode/keystroke feedback into
- * `statusBarNode`. Ex commands route to this editor while it holds focus: `:w`/`:wq`/`:x` run
- * `actions.onWrite`; `:q` closes via `actions.onClose` only when `actions.isDirty()` is false, `:q!`
- * closes regardless, and `:wq`/`:x` close only after the write resolves; and `:set` adjusts the editor.
- * monaco-vim is imported lazily so merely loading the editor (in tests, or for users on the default
- * keymap) never pulls in the adapter or its deep monaco-editor imports.
+ * `statusBarNode`. This editor's Ex commands route to `actions`: `:w`/`:wq`/`:x` run `onWrite`;
+ * `:q` closes via `onClose` only when `isDirty()` is false, `:q!` closes regardless, and `:wq`/`:x`
+ * close only after the write resolves; `:set` adjusts the editor. monaco-vim is imported lazily so
+ * loading the editor (in tests, or on the default keymap) never pulls in the adapter.
  */
 export async function installMonacoVimMode(
   editorInstance: editor.IStandaloneCodeEditor,
   statusBarNode: HTMLElement,
   actions: VimEditorActions
 ): Promise<VimModeController> {
-  const { initVimMode, VimMode } = await import('monaco-vim')
-  ensureExCommands(VimMode)
-  const vim = initVimMode(editorInstance, statusBarNode)
-  // Why: only claim the shared handlers if this editor already has focus; otherwise let
-  // onDidFocusEditorText claim them on focus, so mounting an unfocused split/tab editor can't
-  // hijack `:w`/`:q` from the currently focused one.
-  if (editorInstance.hasTextFocus()) {
-    active = actions
-  }
-  const focusSub = editorInstance.onDidFocusEditorText(() => {
-    active = actions
+  const initVimMode = await loadVimMode()
+  const adapter = initVimMode(editorInstance, statusBarNode)
+  const entry: VimEntry = { actions, insertMode: false }
+  adapter.on('vim-mode-change', (event: { mode: string }) => {
+    entry.insertMode = event.mode === 'insert' || event.mode === 'replace'
   })
+  if (entries.size === 0) {
+    addAppKeyListener('keydown', claimVimCtrlChord, { first: true })
+  }
+  entries.set(adapter, entry)
   let disposed = false
   return {
     dispose: (): void => {
@@ -178,11 +219,11 @@ export async function installMonacoVimMode(
         return
       }
       disposed = true
-      focusSub.dispose()
-      if (active === actions) {
-        active = null
+      entries.delete(adapter)
+      if (entries.size === 0) {
+        removeAppKeyListener('keydown', claimVimCtrlChord)
       }
-      vim.dispose()
+      adapter.dispose()
     }
   }
 }

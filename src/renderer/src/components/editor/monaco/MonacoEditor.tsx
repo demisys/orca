@@ -427,7 +427,8 @@ export default function MonacoEditor({
           <div
             ref={vimStatusBarRef}
             data-orca-vim-statusbar
-            className="min-w-0 flex-1 overflow-hidden font-mono text-xs text-muted-foreground"
+            // Why the input variants: monaco-vim injects an unstyled `:` command <input> into this node.
+            className="min-w-0 flex-1 overflow-hidden font-mono text-xs text-muted-foreground [&>span]:mr-3 [&_input]:border-0 [&_input]:bg-transparent [&_input]:font-[inherit] [&_input]:text-foreground [&_input]:outline-none"
           />
           <VimCheatsheet />
         </div>

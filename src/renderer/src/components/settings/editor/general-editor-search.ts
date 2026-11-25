@@ -52,6 +52,26 @@ export const getGeneralEditorSearchDescriptors = createLocalizedCatalog(() => [
       ...translateSearchKeyword('auto.components.settings.general.search.3ca5ab78a5', 'code')
     ]
   }),
+  generalSetting(GENERAL_SETTING_ANCHORS.editorKeybindings, {
+    title: translate(
+      'auto.components.settings.EditorKeybindingsSetting.78648745bc',
+      'Editor Keybindings'
+    ),
+    description: translate(
+      'auto.components.settings.EditorKeybindingsSetting.a30ca600ee',
+      'Use Vim modal keybindings in the code editor instead of standard editing.'
+    ),
+    keywords: [
+      ...translateSearchKeyword(
+        'auto.components.settings.EditorKeybindingsSetting.77674e2d1e',
+        'Vim',
+        {
+          aliases: ['keybindings', 'keymap', 'modal', 'motions']
+        }
+      ),
+      ...translateSearchKeyword('auto.components.settings.general.search.e1ee631696', 'editor')
+    ]
+  }),
   generalSetting(GENERAL_SETTING_ANCHORS.collapseUnchanged, {
     title: translate(
       'auto.components.settings.general.search.aa367d753d',
