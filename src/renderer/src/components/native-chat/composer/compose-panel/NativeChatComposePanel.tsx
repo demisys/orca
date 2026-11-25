@@ -20,7 +20,8 @@ import { isImeOwnedKeyboardEvent } from '@/lib/text-input/ime/ime-composition-ke
 import { useLatestHandler } from '@/lib/use-latest-handler'
 import { useTranslate } from '@/i18n/use-translate'
 import { useAppStore } from '@/store'
-import { useSidebarResize } from '@/hooks/useSidebarResize'
+import { clampSidebarResizeWidth, useSidebarResize } from '@/hooks/useSidebarResize'
+import { isPlainEscapeKeyEvent } from '@/components/terminal-pane/input/keyboard/agent-interrupt-key-event'
 import { cn } from '@/lib/class-names'
 import type { NativeChatComposerInput } from '../editor/native-chat-composer-input'
 import { createNativeChatComposePanelExtensions } from './native-chat-compose-panel-extensions'
@@ -48,42 +49,49 @@ export function nativeChatComposeTarget(
 // A line starting one of these blocks has to start its own line in the composer too.
 const BLOCK_START = /^(?:#{1,6}\s|>|[-*+]\s|\d{1,9}[.)]\s|```|~~~)/
 
-function selectTarget(input: NativeChatComposerInput, target: NativeChatComposeTarget): boolean {
-  if (target.kind === 'selection') {
-    // The composer may have changed while the panel was open; follow the selected text if it moved.
-    const from =
-      input.value.slice(target.from, target.to) === target.original
-        ? target.from
-        : input.value.indexOf(target.original)
-    if (from !== -1) {
-      input.setSelectionRange(from, from + target.original.length)
-      return true
-    }
+/** Where the selected text is now: followed through edits, else its old place, else its only copy. */
+function findSelection(
+  value: string,
+  target: Extract<NativeChatComposeTarget, { kind: 'selection' }>,
+  trackedFrom: number | null
+): number | null {
+  const at = (from: number | null): boolean =>
+    from !== null && value.slice(from, from + target.original.length) === target.original
+  if (at(trackedFrom)) {
+    return trackedFrom
   }
-  if (target.kind !== 'caret') {
-    input.setSelectionRange(input.value.length, input.value.length)
+  if (at(target.from)) {
+    return target.from
   }
-  return false
+  const only = value.indexOf(target.original)
+  // Two copies and no way to tell which was selected: replacing either could be wrong.
+  return only !== -1 && only === value.lastIndexOf(target.original) ? only : null
 }
 
 /** Puts the panel's Markdown in the composer: over the edited selection (inline when it stays one
- *  line of text), else on lines of its own at the caret or after the draft. */
+ *  line of text), else on lines of its own at the caret or after the draft. False when nothing went in. */
 function insertIntoComposer(
   input: NativeChatComposerInput | null,
   markdown: string,
-  target: NativeChatComposeTarget
-): void {
+  target: NativeChatComposeTarget,
+  trackedFrom: number | null
+): boolean {
   const text = markdown.trim()
   if (!input?.insertText || input.disabled || !text) {
-    return
+    return false
   }
-  const replacing = selectTarget(input, target)
-  if (replacing && target.kind === 'selection' && !text.includes('\n') && !BLOCK_START.test(text)) {
-    // Keep the spaces the selection had around its words.
-    const lead = /^\s*/.exec(target.original)?.[0] ?? ''
-    const trail = /\s*$/.exec(target.original)?.[0] ?? ''
-    input.insertText(`${lead}${text}${trail}`)
-    return
+  const from = target.kind === 'selection' ? findSelection(input.value, target, trackedFrom) : null
+  if (target.kind === 'selection' && from !== null) {
+    input.setSelectionRange(from, from + target.original.length)
+    if (!text.includes('\n') && !BLOCK_START.test(text)) {
+      // Keep the spaces the selection had around its words.
+      const lead = /^\s*/.exec(target.original)?.[0] ?? ''
+      const trail = /\s*$/.exec(target.original)?.[0] ?? ''
+      input.insertText(`${lead}${text}${trail}`)
+      return true
+    }
+  } else if (target.kind !== 'caret') {
+    input.setSelectionRange(input.value.length, input.value.length)
   }
   const before = input.value.slice(0, input.selectionStart ?? input.value.length)
   const after = input.value.slice(input.selectionEnd ?? input.value.length)
@@ -95,16 +103,20 @@ function insertIntoComposer(
     const end = (input.selectionStart ?? 1) - 1
     input.setSelectionRange(end, end)
   }
+  return true
 }
 
 function NativeChatComposePanelEditor({
   initialContent,
+  insertDisabled,
   height,
   onHeightChange,
   onChange,
   onInsert,
   onClose
 }: {
+  /** The composer cannot take text right now (it is disabled); Insert waits. */
+  insertDisabled: boolean
   height: number
   onHeightChange: (height: number) => void
   /** A saved draft's document, or composer text (Markdown) to edit. */
@@ -121,7 +133,7 @@ function NativeChatComposePanelEditor({
   // What the editor opened with, so inserting an untouched edit can leave the composer text alone.
   const openedWith = useRef<string | null>(null)
   const insert = useLatestHandler((target: Editor | null) => {
-    if (target && !target.isEmpty) {
+    if (target && !target.isEmpty && !insertDisabled) {
       onInsert(target.getMarkdown(), JSON.stringify(target.getJSON()) === openedWith.current)
     }
   })
@@ -218,7 +230,11 @@ function NativeChatComposePanelEditor({
           if (step) {
             event.preventDefault()
             onHeightChange(
-              Math.min(composePanelMaxHeight(), Math.max(COMPOSE_PANEL_MIN_HEIGHT, height + step))
+              clampSidebarResizeWidth(
+                height + step,
+                COMPOSE_PANEL_MIN_HEIGHT,
+                composePanelMaxHeight()
+              )
             )
           }
         }}
@@ -234,7 +250,12 @@ function NativeChatComposePanelEditor({
         <LinearIssueMarkdownToolbar editor={editor} disabled={false} />
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button type="button" size="xs" disabled={empty} onClick={() => insert(editor)}>
+            <Button
+              type="button"
+              size="xs"
+              disabled={empty || insertDisabled}
+              onClick={() => insert(editor)}
+            >
               {t('components.native-chat.compose.insert', 'Insert')}
             </Button>
           </TooltipTrigger>
@@ -267,14 +288,7 @@ function NativeChatComposePanelEditor({
 }
 
 function isPlainEscape(event: KeyboardEvent | React.KeyboardEvent): boolean {
-  return (
-    event.key === 'Escape' &&
-    !event.altKey &&
-    !event.ctrlKey &&
-    !event.metaKey &&
-    !event.shiftKey &&
-    !isImeOwnedKeyboardEvent(event)
-  )
+  return isPlainEscapeKeyEvent(event) && !isImeOwnedKeyboardEvent(event)
 }
 
 const COMPOSE_PANEL_MIN_HEIGHT = 160
@@ -285,21 +299,52 @@ function composePanelMaxHeight(): number {
   return Math.max(COMPOSE_PANEL_MIN_HEIGHT, Math.round(window.innerHeight * 0.75))
 }
 
+// Per draft scope, like composer drafts: the composer unmounts behind prompt cards and subagent views.
+const composeDrafts = new Map<string, JSONContent>()
+
 /** A rich editor above the composer for a longer prompt, or for a highlighted part of it; Insert
  *  puts its Markdown in the composer. Open while `target` is set. */
 export function NativeChatComposePanel({
   target,
+  scopeKey,
+  insertDisabled,
   onClose,
   inputRef
 }: {
   target: NativeChatComposeTarget | null
+  /** The composer's draft scope; the panel's own draft is kept under it. */
+  scopeKey: string | undefined
+  insertDisabled: boolean
   onClose: () => void
   inputRef: RefObject<NativeChatComposerInput | null>
 }): React.JSX.Element | null {
   // Kept while closed, so Escape or × never loses a draft; Insert clears it. Editing a selection
   // sets it aside rather than replacing it.
-  const [draft, setDraft] = useState<JSONContent | null>(null)
+  const [draft, setDraftState] = useState<JSONContent | null>(() =>
+    scopeKey ? (composeDrafts.get(scopeKey) ?? null) : null
+  )
+  const setDraft = (next: JSONContent | null): void => {
+    if (scopeKey) {
+      if (next) {
+        composeDrafts.set(scopeKey, next)
+      } else {
+        composeDrafts.delete(scopeKey)
+      }
+    }
+    setDraftState(next)
+  }
   const [height, setHeight] = useState(lastComposePanelHeight)
+  // The selected text's start, followed through composer edits made while the panel is open.
+  const trackedFrom = useRef<number | null>(null)
+  useEffect(() => {
+    if (target?.kind !== 'selection') {
+      return
+    }
+    trackedFrom.current = target.from
+    return inputRef.current?.trackTextPosition?.(target.from, (offset) => {
+      trackedFrom.current = offset
+    })
+  }, [target, inputRef])
   if (!target) {
     return null
   }
@@ -311,6 +356,7 @@ export function NativeChatComposePanel({
   return (
     <NativeChatComposePanelEditor
       initialContent={editing ? target.original : draft}
+      insertDisabled={insertDisabled}
       height={height}
       onHeightChange={(next) => {
         lastComposePanelHeight = next
@@ -318,8 +364,13 @@ export function NativeChatComposePanel({
       }}
       onChange={editing ? () => {} : setDraft}
       onInsert={(markdown, unchanged) => {
-        if (!(editing && unchanged)) {
-          insertIntoComposer(inputRef.current, markdown, target)
+        if (editing && unchanged) {
+          close()
+          return
+        }
+        // Why: a composer that took nothing (disabled since) must not cost the draft.
+        if (!insertIntoComposer(inputRef.current, markdown, target, trackedFrom.current)) {
+          return
         }
         if (!editing) {
           setDraft(null)

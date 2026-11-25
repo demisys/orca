@@ -34,7 +34,13 @@ function Composer({ initiallyOpen = true }: { initiallyOpen?: boolean }): React.
   )
   return (
     <div className="native-chat-appearance p-4">
-      <NativeChatComposePanel target={target} onClose={() => setTarget(null)} inputRef={inputRef} />
+      <NativeChatComposePanel
+        target={target}
+        scopeKey={undefined}
+        insertDisabled={false}
+        onClose={() => setTarget(null)}
+        inputRef={inputRef}
+      />
       <div className="rounded-xl border border-chat-composer-border bg-chat-composer-surface p-1.5 shadow-xs">
         <NativeChatPromptEditor
           inputRef={inputRef}

@@ -189,7 +189,20 @@ export function NativeChatComposerField({
 
   // Stable so the memoized option pickers keep their identity.
   const focusComposer = useCallback(() => textareaRef.current?.focus(), [textareaRef])
-  const [composeTarget, setComposeTarget] = useState<NativeChatComposeTarget | null>(null)
+  // Tied to the draft scope it opened in, so a panel never inserts into another chat's composer.
+  const [compose, setCompose] = useState<{
+    scope: string | undefined
+    target: NativeChatComposeTarget
+  } | null>(null)
+  const composeTarget = compose?.scope === draftScopeKey ? compose.target : null
+  const toggleCompose = useLatestHandler(() => {
+    if (composeTarget) {
+      setCompose(null)
+      textareaRef.current?.focus()
+    } else {
+      setCompose({ scope: draftScopeKey, target: nativeChatComposeTarget(textareaRef.current) })
+    }
+  })
   // A launch prompt sits in a popover, so it takes the app's surface instead of the chat's.
   const launch = launchPrompt !== undefined
   const card = useRef<HTMLDivElement>(null)
@@ -229,8 +242,11 @@ export function NativeChatComposerField({
             className="mb-1.5"
           />
           <NativeChatComposePanel
+            key={draftScopeKey}
             target={composeTarget}
-            onClose={() => setComposeTarget(null)}
+            scopeKey={draftScopeKey}
+            insertDisabled={disabled}
+            onClose={() => setCompose(null)}
             inputRef={textareaRef}
           />
           <div
@@ -337,14 +353,7 @@ export function NativeChatComposerField({
                 isDictating={isDictating}
                 isDictationHoldMode={isDictationHoldMode}
                 onAttach={attach}
-                onCompose={
-                  editSession || disabled
-                    ? undefined
-                    : () =>
-                        setComposeTarget(
-                          composeTarget ? null : nativeChatComposeTarget(textareaRef.current)
-                        )
-                }
+                onCompose={editSession || disabled ? undefined : toggleCompose}
                 onDictationToggle={dictationToggle}
                 onDictationHoldStart={dictationHoldStart}
                 onDictationHoldEnd={dictationHoldEnd}
