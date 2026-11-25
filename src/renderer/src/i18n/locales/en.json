@@ -23199,7 +23199,8 @@
         "close": "Close",
         "insert": "Insert",
         "title": "Compose prompt",
-        "resize": "Resize compose panel"
+        "resize": "Resize compose panel",
+        "toolbarLabel": "Prompt formatting"
       }
     },
     "tab": {

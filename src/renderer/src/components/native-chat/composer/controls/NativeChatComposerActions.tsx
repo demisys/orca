@@ -206,7 +206,15 @@ export const NativeChatComposerActions = memo(function NativeChatComposerActions
           {
             id: 'compose',
             priority: 3,
-            content: <NativeChatComposeButton onCompose={onCompose} />
+            content: <NativeChatComposeButton onCompose={onCompose} />,
+            overflow: (close: () => void) => (
+              <NativeChatComposeButton
+                onCompose={() => {
+                  close()
+                  onCompose()
+                }}
+              />
+            )
           }
         ]
       : []),

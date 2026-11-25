@@ -7,6 +7,7 @@ import {
   type JSONContent
 } from '@tiptap/react'
 import { X } from 'lucide-react'
+import { isNodeEmpty } from '@tiptap/core'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { LinearIssueMarkdownToolbar } from '@/components/task-page/linear/issue-workspace/LinearIssueMarkdownToolbar'
@@ -49,16 +50,18 @@ export function nativeChatComposeTarget(
 // A line starting one of these blocks has to start its own line in the composer too.
 const BLOCK_START = /^(?:#{1,6}\s|>|[-*+]\s|\d{1,9}[.)]\s|```|~~~)/
 
-/** Where the selected text is now: followed through edits, else its old place, else its only copy. */
+/** Where the selected text is now, or null when it is gone. `trackedFrom` follows it through edits
+ *  (null once deleted or replaced); without tracking, its old place, else its only copy. */
 function findSelection(
   value: string,
   target: Extract<NativeChatComposeTarget, { kind: 'selection' }>,
-  trackedFrom: number | null
+  trackedFrom: number | null | undefined
 ): number | null {
   const at = (from: number | null): boolean =>
     from !== null && value.slice(from, from + target.original.length) === target.original
-  if (at(trackedFrom)) {
-    return trackedFrom
+  if (trackedFrom !== undefined) {
+    // Why: once the tracked text changed, a copy elsewhere is not what the user selected.
+    return at(trackedFrom) ? trackedFrom : null
   }
   if (at(target.from)) {
     return target.from
@@ -74,7 +77,7 @@ function insertIntoComposer(
   input: NativeChatComposerInput | null,
   markdown: string,
   target: NativeChatComposeTarget,
-  trackedFrom: number | null
+  trackedFrom: number | null | undefined
 ): boolean {
   const text = markdown.trim()
   if (!input?.insertText || input.disabled || !text) {
@@ -86,7 +89,7 @@ function insertIntoComposer(
     if (!text.includes('\n') && !BLOCK_START.test(text)) {
       // Keep the spaces the selection had around its words.
       const lead = /^\s*/.exec(target.original)?.[0] ?? ''
-      const trail = /\s*$/.exec(target.original)?.[0] ?? ''
+      const trail = /\s*$/.exec(target.original.slice(lead.length))?.[0] ?? ''
       input.insertText(`${lead}${text}${trail}`)
       return true
     }
@@ -133,8 +136,9 @@ function NativeChatComposePanelEditor({
   // What the editor opened with, so inserting an untouched edit can leave the composer text alone.
   const openedWith = useRef<string | null>(null)
   const insert = useLatestHandler((target: Editor | null) => {
-    if (target && !target.isEmpty && !insertDisabled) {
-      onInsert(target.getMarkdown(), JSON.stringify(target.getJSON()) === openedWith.current)
+    if (target && !isBlank(target) && !insertDisabled) {
+      const markdown = target.getMarkdown()
+      onInsert(markdown, markdown.trimEnd() === openedWith.current)
     }
   })
   const close = useLatestHandler(onClose)
@@ -174,17 +178,23 @@ function NativeChatComposePanelEditor({
           return false
         }
       },
+      // Why: main routes bare Cmd/Ctrl+B and Cmd/Ctrl+K to TipTap only while a Markdown editor has focus.
+      onFocus: () => window.api?.ui?.setMarkdownEditorFocused?.(true),
+      onBlur: () => window.api?.ui?.setMarkdownEditorFocused?.(false),
       onCreate: ({ editor: created }) => {
-        openedWith.current = JSON.stringify(created.getJSON())
+        // Markdown, not the document: an empty trailing paragraph added after creation saves as nothing.
+        openedWith.current = created.getMarkdown().trimEnd()
       },
       // The document, not its Markdown, so reopening restores exactly what was written.
-      onUpdate: ({ editor: next }) => onChange(next.isEmpty ? null : next.getJSON())
+      onUpdate: ({ editor: next }) => onChange(isBlank(next) ? null : next.getJSON())
     },
     [extensions]
   )
   useEffect(() => {
     editorRef.current = editor
   }, [editor])
+  // Closing by Escape or Insert unmounts the editor while focused, before any blur.
+  useEffect(() => () => window.api?.ui?.setMarkdownEditorFocused?.(false), [])
   const { containerRef, isResizing, onResizeStart } = useSidebarResize<HTMLDivElement>({
     isOpen: true,
     width: height,
@@ -194,12 +204,12 @@ function NativeChatComposePanelEditor({
     deltaSign: -1,
     axis: 'y',
     measureMaxSize: composePanelMaxHeight,
-    applyRenderedSize: (container, size) => {
-      container.style.height = `${size}px`
-    },
+    // A window shrunk since the last resize caps the panel below its saved height.
+    measureStartSize: (container) => container.getBoundingClientRect().height,
+    applyRenderedSize: applyComposePanelHeight,
     setWidth: onHeightChange
   })
-  const empty = useEditorState({ editor, selector: ({ editor: e }) => e?.isEmpty ?? true }) ?? true
+  const empty = useEditorState({ editor, selector: ({ editor: e }) => !e || isBlank(e) }) ?? true
   const closeLabel = t('components.native-chat.compose.close', 'Close')
 
   return (
@@ -247,7 +257,13 @@ function NativeChatComposePanelEditor({
         />
       </div>
       <div className="flex shrink-0 items-center gap-1 border-b border-chat-composer-border pr-1.5 [&>.linear-issue-markdown-toolbar]:min-w-0 [&>.linear-issue-markdown-toolbar]:flex-1 [&>.linear-issue-markdown-toolbar]:border-0 [&>.linear-issue-markdown-toolbar]:bg-transparent">
-        <LinearIssueMarkdownToolbar editor={editor} disabled={false} />
+        <LinearIssueMarkdownToolbar
+          editor={editor}
+          disabled={false}
+          ariaLabel={t('components.native-chat.compose.toolbarLabel', 'Prompt formatting')}
+          // Its link prompt uses window.prompt, which Electron replaces with one that throws.
+          showLink={false}
+        />
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -295,6 +311,14 @@ const COMPOSE_PANEL_MIN_HEIGHT = 160
 // The height the last panel was left at, so a panel in another chat opens at the same size.
 let lastComposePanelHeight = 320
 
+function applyComposePanelHeight(container: HTMLElement, height: number): void {
+  container.style.height = `${height}px`
+}
+
+function isBlank(editor: Editor): boolean {
+  return isNodeEmpty(editor.state.doc, { ignoreWhitespace: true })
+}
+
 function composePanelMaxHeight(): number {
   return Math.max(COMPOSE_PANEL_MIN_HEIGHT, Math.round(window.innerHeight * 0.75))
 }
@@ -335,13 +359,15 @@ export function NativeChatComposePanel({
   }
   const [height, setHeight] = useState(lastComposePanelHeight)
   // The selected text's start, followed through composer edits made while the panel is open.
-  const trackedFrom = useRef<number | null>(null)
+  const trackedFrom = useRef<number | null | undefined>(undefined)
   useEffect(() => {
-    if (target?.kind !== 'selection') {
+    const track = inputRef.current?.trackTextPosition
+    if (target?.kind !== 'selection' || !track) {
+      trackedFrom.current = undefined
       return
     }
     trackedFrom.current = target.from
-    return inputRef.current?.trackTextPosition?.(target.from, (offset) => {
+    return track(target.from, (offset) => {
       trackedFrom.current = offset
     })
   }, [target, inputRef])

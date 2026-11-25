@@ -120,10 +120,16 @@ function readActiveFormats(editor: Editor | null): Record<ActiveFormat, boolean>
 
 export function LinearIssueMarkdownToolbar({
   editor,
-  disabled
+  disabled,
+  ariaLabel,
+  showLink = true
 }: {
   editor: Editor | null
   disabled: boolean
+  /** The toolbar's accessible name where it formats something other than an issue description. */
+  ariaLabel?: string
+  /** False where the link prompt cannot open; links can still be typed as Markdown. */
+  showLink?: boolean
 }): React.JSX.Element {
   const t = useTranslate()
   // Why: this toolbar can outlive editor recreation, so subscribe directly to language changes.
@@ -145,10 +151,13 @@ export function LinearIssueMarkdownToolbar({
   return (
     <div
       className="linear-issue-markdown-toolbar"
-      aria-label={t(
-        'auto.components.LinearIssueMarkdownDescriptionEditor.7c52151156',
-        'Issue description formatting'
-      )}
+      aria-label={
+        ariaLabel ??
+        t(
+          'auto.components.LinearIssueMarkdownDescriptionEditor.7c52151156',
+          'Issue description formatting'
+        )
+      }
     >
       <LinearIssueMarkdownToolbarButton
         label={t('auto.components.LinearIssueMarkdownDescriptionEditor.68a41d5665', 'Body text')}
@@ -255,18 +264,20 @@ export function LinearIssueMarkdownToolbar({
       >
         <Quote className="size-3.5" />
       </LinearIssueMarkdownToolbarButton>
-      <LinearIssueMarkdownToolbarButton
-        label={
-          active.link
-            ? t('auto.components.LinearIssueMarkdownDescriptionEditor.340160f4e8', 'Remove link')
-            : t('auto.components.LinearIssueMarkdownDescriptionEditor.632096eb1c', 'Link')
-        }
-        active={active.link}
-        disabled={disabled}
-        onClick={() => runCommand(applyLinearIssueLink)}
-      >
-        <LinkIcon className="size-3.5" />
-      </LinearIssueMarkdownToolbarButton>
+      {showLink ? (
+        <LinearIssueMarkdownToolbarButton
+          label={
+            active.link
+              ? t('auto.components.LinearIssueMarkdownDescriptionEditor.340160f4e8', 'Remove link')
+              : t('auto.components.LinearIssueMarkdownDescriptionEditor.632096eb1c', 'Link')
+          }
+          active={active.link}
+          disabled={disabled}
+          onClick={() => runCommand(applyLinearIssueLink)}
+        >
+          <LinkIcon className="size-3.5" />
+        </LinearIssueMarkdownToolbarButton>
+      ) : null}
     </div>
   )
 }
