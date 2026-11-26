@@ -28,6 +28,7 @@ import { settleAttentionRemovedBy } from '../../slices/workspace-attention/atten
 import { runAsAutomaticDeselection } from '../../workspaces/selection/active-worktree-deselection-intent'
 import { recordDraft, tabBucketDraft } from '../../record-transitions/keyed-record-transitions'
 import { closeChatDockTerminalsOwnedBy } from '../tabs/creation/chat-dock-terminal-creation'
+import { firstTabBarTerminal } from '../../../../../shared/workspace-layout/chat-dock-terminal'
 
 export function createTerminalTabCloseActions(
   set: TerminalStoreSet,
@@ -191,7 +192,7 @@ export function createTerminalTabCloseActions(
             if (nextActiveTabIdByWorktree === s.activeTabIdByWorktree) {
               nextActiveTabIdByWorktree = { ...s.activeTabIdByWorktree }
             }
-            nextActiveTabIdByWorktree[wId] = tabs.find((tab) => !tab.chatDock)?.id ?? null
+            nextActiveTabIdByWorktree[wId] = firstTabBarTerminal(tabs)?.id ?? null
           }
           // Why: keep tabBarOrderByWorktree in sync so stale terminal IDs don't linger and shift positions on later tab operations.
           let nextTabBarOrderByWorktree: Record<string, string[]> = s.tabBarOrderByWorktree

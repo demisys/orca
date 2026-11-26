@@ -1,4 +1,5 @@
 import { useAppStore } from '@/store/index'
+import { firstTabBarTerminal } from '../../../../../../shared/workspace-layout/chat-dock-terminal'
 import {
   selectDetectedWorktreesByRepo,
   selectFolderWorkspaces,
@@ -77,7 +78,7 @@ function stopPendingHookCommandSubscriptionIfIdle(): void {
 function flushPendingHookCommandDeliveries(): void {
   const state = useAppStore.getState()
   for (const [worktreeId, deliveries] of pendingHookCommandDeliveries) {
-    const firstTerminalTabId = state.tabsByWorktree[worktreeId]?.[0]?.id
+    const firstTerminalTabId = firstTabBarTerminal(state.tabsByWorktree[worktreeId])?.id
     if (!firstTerminalTabId) {
       // Drop removed workspaces so pending entries cannot hold the subscription forever.
       if (!state.getKnownWorktreeById(worktreeId)) {

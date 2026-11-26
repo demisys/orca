@@ -7,8 +7,12 @@ import { useAppStore } from '@/store'
 import { clampSidebarResizeWidth, useSidebarResize } from '@/hooks/useSidebarResize'
 import { cn } from '@/lib/class-names'
 import { findChatDockTerminal } from '@/store/terminals/tabs/creation/chat-dock-terminal-creation'
-import { claimChatDockTerminalPortal } from './chat-dock-terminal-portal'
+import {
+  CHAT_DOCK_TERMINAL_ATTRIBUTE,
+  claimChatDockTerminalPortal
+} from './chat-dock-terminal-portal'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../../../shared/workspace/identity/floating-workspace-id'
+import { findChatDockOwnerTab } from '../../../../../../shared/workspace-layout/chat-dock-terminal'
 
 /** The chat that owns a docked shell, by the workspace it runs in. */
 export type NativeChatTerminalDock = { worktreeId: string; ownerTabId: string }
@@ -16,6 +20,10 @@ export type NativeChatTerminalDock = { worktreeId: string; ownerTabId: string }
 // Per chat tab, so the panel survives the composer unmounting behind prompt cards and subagent views.
 const openPanels = new Set<string>()
 const openPanelSubscribers = new Set<() => void>()
+// The worktree each open panel created its shell in; a shell missing there has exited, even while unmounted.
+const createdDockWorktreeByOwner = new Map<string, string>()
+// Opening focuses the shell once; remounts from tab switches or subagent views leave focus alone.
+const focusOnMountOwners = new Set<string>()
 
 function subscribeOpenPanels(onChange: () => void): () => void {
   openPanelSubscribers.add(onChange)
@@ -30,8 +38,11 @@ export function setNativeChatTerminalPanelOpen(ownerTabId: string, open: boolean
   }
   if (open) {
     openPanels.add(ownerTabId)
+    focusOnMountOwners.add(ownerTabId)
   } else {
     openPanels.delete(ownerTabId)
+    focusOnMountOwners.delete(ownerTabId)
+    createdDockWorktreeByOwner.delete(ownerTabId)
   }
   for (const subscriber of openPanelSubscribers) {
     subscriber()
@@ -49,7 +60,7 @@ function findChatTabWorktreeId(
   chatTabId: string
 ): string | null {
   for (const [worktreeId, tabs] of Object.entries(unifiedTabsByWorktree)) {
-    if (tabs.some((tab) => tab.id === chatTabId || tab.entityId === chatTabId)) {
+    if (findChatDockOwnerTab(tabs, chatTabId)) {
       return worktreeId
     }
   }
@@ -85,11 +96,17 @@ function applyTerminalPanelHeight(container: HTMLElement, height: number): void 
   container.style.height = `${height}px`
 }
 
-/** Focuses the shell once its xterm has mounted in `host`. */
-function focusWhenTerminalMounts(host: HTMLElement): () => void {
+/** Focuses the shell once its xterm has mounted in `host`, if the user just opened the panel. */
+function focusWhenTerminalMounts(host: HTMLElement, ownerTabId: string): () => void {
+  if (!focusOnMountOwners.has(ownerTabId)) {
+    return () => {}
+  }
   const tryFocus = (): boolean => {
     const helper = host.querySelector<HTMLElement>('.xterm-helper-textarea')
     helper?.focus()
+    if (helper) {
+      focusOnMountOwners.delete(ownerTabId)
+    }
     return helper !== null
   }
   if (tryFocus()) {
@@ -118,16 +135,22 @@ export function NativeChatTerminalPanel({
   const createChatDockTerminal = useAppStore((s) => s.createChatDockTerminal)
   const tabId = useAppStore((s) => findChatDockTerminal(s, worktreeId, ownerTabId)?.id ?? null)
   // Created only by opening; a tab that vanishes afterwards means the shell exited.
-  const [created, setCreated] = useState(false)
   useLayoutEffect(() => {
-    createChatDockTerminal(worktreeId, ownerTabId)
-    setCreated(true)
+    if (createdDockWorktreeByOwner.get(ownerTabId) !== worktreeId) {
+      createChatDockTerminal(worktreeId, ownerTabId)
+      createdDockWorktreeByOwner.set(ownerTabId, worktreeId)
+    }
   }, [createChatDockTerminal, worktreeId, ownerTabId])
   useEffect(() => {
-    if (created && tabId === null) {
+    // Live state: the render that ran this effect can predate the layout effect's create.
+    if (
+      tabId === null &&
+      createdDockWorktreeByOwner.get(ownerTabId) === worktreeId &&
+      !findChatDockTerminal(useAppStore.getState(), worktreeId, ownerTabId)
+    ) {
       onClose()
     }
-  }, [created, tabId, onClose])
+  }, [tabId, worktreeId, ownerTabId, onClose])
 
   const [host, setHost] = useState<HTMLDivElement | null>(null)
   const [focused, setFocused] = useState(false)
@@ -158,7 +181,10 @@ export function NativeChatTerminalPanel({
       host.removeEventListener('focusout', syncAfterBlur)
     }
   }, [host])
-  useEffect(() => (host ? focusWhenTerminalMounts(host) : undefined), [host])
+  useEffect(
+    () => (host ? focusWhenTerminalMounts(host, ownerTabId) : undefined),
+    [host, ownerTabId]
+  )
 
   const [height, setHeight] = useState(lastTerminalPanelHeight)
   const updateHeight = (next: number): void => {
@@ -183,6 +209,7 @@ export function NativeChatTerminalPanel({
   return (
     <div
       ref={containerRef}
+      {...{ [CHAT_DOCK_TERMINAL_ATTRIBUTE]: '' }}
       role="region"
       aria-label={t('components.native-chat.terminal.title', 'Shell')}
       style={{ height }}

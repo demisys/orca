@@ -23,6 +23,7 @@ import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../../shared/workspace/i
 import { translate } from '@/i18n/i18n'
 import { getKeybindingContext } from '../workbench/terminal-workspace-model'
 import { isAgentTerminalPreviewTarget } from '../../dashboard/terminal-preview/agent-terminal-preview-target'
+import { isChatDockTerminalElement } from '../../native-chat/composer/terminal-panel/chat-dock-terminal-portal'
 import { resolveTerminalAgentTabShortcut } from './terminal-agent-tab-shortcut'
 import { getDetectionTargetIdentityForWorktree } from '@/lib/agent-session/launch/inventory/agent-detection-target-inventory'
 import {
@@ -203,7 +204,8 @@ export function handleTerminalWorkspaceKeyDown(
     return
   }
   if (!event.repeat && matchShortcut('tab.close')) {
-    if (previewOwnsClose || floatingWorkspaceFocused) {
+    // The active tab is the chat; the docked shell's own pane handler closes just the shell.
+    if (previewOwnsClose || floatingWorkspaceFocused || isChatDockTerminalElement(event.target)) {
       return
     }
     if (dispatchWorkspaceTabCommand({ type: 'close', context })) {

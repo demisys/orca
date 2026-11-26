@@ -3,6 +3,7 @@ import {
   replaceRecordEntries
 } from '@/store/record-transitions/keyed-record-transitions'
 import type { AppState } from '../../types'
+import { isAttachedChatDock } from '../../../../../shared/workspace-layout/chat-dock-terminal'
 
 type TerminalTabReconnectState = Pick<
   AppState,
@@ -56,17 +57,16 @@ export function getOrphanTerminalIds(
   worktreeId: string
 ): Set<string> {
   const runtimeTabs = state.tabsByWorktree[worktreeId] ?? []
+  const unifiedTabs = state.unifiedTabsByWorktree[worktreeId] ?? []
   const unifiedTerminalEntityIds = new Set(
-    (state.unifiedTabsByWorktree[worktreeId] ?? [])
-      .filter((tab) => tab.contentType === 'terminal')
-      .map((tab) => tab.entityId)
+    unifiedTabs.filter((tab) => tab.contentType === 'terminal').map((tab) => tab.entityId)
   )
 
   return new Set(
     runtimeTabs
       .filter((tab) => {
-        // A chat-docked shell has no tab-bar entry by design; its chat tab owns its lifetime.
-        if (unifiedTerminalEntityIds.has(tab.id) || tab.chatDock) {
+        // A docked shell has no tab-bar entry while its chat is open; the chat owns its lifetime.
+        if (unifiedTerminalEntityIds.has(tab.id) || isAttachedChatDock(tab, unifiedTabs)) {
           return false
         }
         // Host loss can emit synthetic exit; missing PTY alone cannot prove user closure. Keep until replacement or explicit close.

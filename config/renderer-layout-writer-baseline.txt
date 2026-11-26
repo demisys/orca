@@ -108,6 +108,7 @@
 2 src/renderer/src/store/terminals/sleep/terminal-pane-hibernation.ts
 1 src/renderer/src/store/terminals/sleep/terminal-shutdown-guards.ts
 3 src/renderer/src/store/terminals/sleep/terminal-shutdown-state.ts
+3 src/renderer/src/store/terminals/tabs/creation/chat-dock-terminal-creation.ts
 1 src/renderer/src/store/terminals/tabs/creation/terminal-tab-agent-launch-pane.ts
 10 src/renderer/src/store/terminals/tabs/creation/terminal-tab-creation.ts
 2 src/renderer/src/store/terminals/tabs/presentation/terminal-tab-appearance.ts

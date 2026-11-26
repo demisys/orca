@@ -22,6 +22,7 @@ import {
   resolveQualifiedFolderWorkspaceResult
 } from '../../../../../shared/folder-workspaces/folder-workspace-execution-host'
 import { folderWorkspaceToWorktree } from '../../../../../shared/folder-workspaces/folder-workspace-worktree'
+import { findChatDockOwnerTab } from '../../../../../shared/workspace-layout/chat-dock-terminal'
 
 export function resolveTerminalPaneOwnerContext(
   state: AppState,
@@ -31,8 +32,11 @@ export function resolveTerminalPaneOwnerContext(
   restoredPtyId?: string | null
 ) {
   const tab = state.tabsByWorktree[worktreeId]?.find((entry) => entry.id === tabId)
-  const tabHost = state.unifiedTabsByWorktree[worktreeId]?.find(
-    (entry) => entry.contentType === 'terminal' && entry.entityId === tabId
+  const unifiedTabs = state.unifiedTabsByWorktree[worktreeId]
+  // A docked shell has no unified tab of its own, so it runs on its chat's host.
+  const tabHost = (
+    unifiedTabs?.find((entry) => entry.contentType === 'terminal' && entry.entityId === tabId) ??
+    (tab?.chatDock ? findChatDockOwnerTab(unifiedTabs, tab.chatDock.ownerTabId) : undefined)
   )?.executionHostId
   const selectedHost = parseExecutionHostId(tabHost)
   const scope = parseWorkspaceKey(worktreeId)

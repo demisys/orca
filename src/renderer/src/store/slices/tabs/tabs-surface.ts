@@ -3,6 +3,7 @@ import type { AppState } from '../../types'
 import { toVisibleTabType } from '../../../../../shared/workspace-layout/tab-groups/tab-types'
 import type { WorkspaceVisibleTabType } from '../../../../../shared/workspace-layout/tab-groups/tab-types'
 import { isEditorTabContentType } from '../editor/tabs/editor-tab-content-type'
+import { firstTabBarTerminal } from '../../../../../shared/workspace-layout/chat-dock-terminal'
 
 export type ActiveSurfaceSourceState = Pick<
   AppState,
@@ -122,7 +123,7 @@ export function deriveActiveSurfaceForWorktree(
         ? activeUnifiedTab.entityId
         : terminalTabStillExists
           ? restoredTerminalTabId
-          : (terminalTabs[0]?.id ?? null),
+          : (firstTabBarTerminal(terminalTabs)?.id ?? null),
     activeTabType
   }
 }

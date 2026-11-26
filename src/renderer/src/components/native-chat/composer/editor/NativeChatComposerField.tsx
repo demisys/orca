@@ -12,6 +12,7 @@ import {
   type NativeChatComposeTarget
 } from '../compose-panel/NativeChatComposePanel'
 import { NativeChatComposerNotices } from '../controls/NativeChatComposerNotices'
+import { isChatDockTerminalElement } from '../terminal-panel/chat-dock-terminal-portal'
 import {
   NativeChatTerminalPanel,
   setNativeChatTerminalPanelOpen,
@@ -223,8 +224,15 @@ export function NativeChatComposerField({
     }
   })
   const closeTerminal = useLatestHandler(() => {
-    if (terminalDock) {
-      setNativeChatTerminalPanelOpen(terminalDock.ownerTabId, false)
+    if (!terminalDock) {
+      return
+    }
+    // The shell is about to move out of view; keep typing landing in the chat, not on <body>.
+    const active = document.activeElement
+    const focusComposer = !active || active === document.body || isChatDockTerminalElement(active)
+    setNativeChatTerminalPanelOpen(terminalDock.ownerTabId, false)
+    if (focusComposer) {
+      textareaRef.current?.focus()
     }
   })
   const card = useRef<HTMLDivElement>(null)

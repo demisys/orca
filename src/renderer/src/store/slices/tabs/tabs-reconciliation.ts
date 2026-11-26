@@ -8,6 +8,7 @@ import { dedupeTabOrder } from '../../../../../shared/workspace-layout/tab-group
 import { ensureWorktreeGroup, updateGroup } from './tab-group-state'
 import { sanitizeRecentTabIds } from './tab-selection-history'
 import { pruneTabGroupLayoutForGroups } from './tabs-hydration'
+import { isAttachedChatDock } from '../../../../../shared/workspace-layout/chat-dock-terminal'
 import {
   buildOrphanTerminalCleanupPatch,
   getOrphanTerminalIds,
@@ -53,8 +54,8 @@ export function projectWorktreeTabModelReconciliation(
     unifiedTabs.filter((tab) => tab.contentType === 'terminal').map((tab) => tab.entityId)
   )
   const legacyRuntimeTerminalTabs = runtimeTerminalTabs.filter((tab) => {
-    // A chat-docked shell stays out of the tab bar even though it has a live PTY.
-    if (unifiedTerminalEntityIds.has(tab.id) || tab.chatDock) {
+    // A docked shell stays out of the tab bar while its chat is open; afterwards it surfaces instead of leaking.
+    if (unifiedTerminalEntityIds.has(tab.id) || isAttachedChatDock(tab, unifiedTabs)) {
       return false
     }
     // Reconnect or unverified host-loss evidence keeps legacy tabs live until replacement binds or user closes them.

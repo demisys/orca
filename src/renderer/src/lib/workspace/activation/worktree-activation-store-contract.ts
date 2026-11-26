@@ -11,7 +11,7 @@ import type { ClosedTerminalTabTombstonesByTabId } from '../../../../../shared/w
 import type { PendingWorktreeCreation } from '../creation/pending-worktree-creation'
 
 export type WorktreeActivationStore = Partial<WorktreeRuntimeOwnerState> & {
-  tabsByWorktree: Record<string, { id: string }[]>
+  tabsByWorktree: Record<string, { id: string; chatDock?: unknown }[]>
   pendingWorktreeCreations?: Record<string, PendingWorktreeCreation>
   closedTerminalTabTombstonesByTabId?: ClosedTerminalTabTombstonesByTabId
   defaultTerminalTabsAppliedByWorktreeId: Record<string, true>

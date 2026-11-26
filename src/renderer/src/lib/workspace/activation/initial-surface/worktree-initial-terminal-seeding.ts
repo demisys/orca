@@ -11,6 +11,7 @@ import { createSequencedSetupAgentCommands } from '../../../../../../shared/agen
 import { getSetupRunnerCommandPlatformForPath } from '../../../../../../shared/agent-launch/startup/setup-runner-command'
 import { agentKindToTuiAgent } from '../../../../../../shared/agent-status/identity/agent-kind'
 import { useAppStore } from '@/store/index'
+import { firstTabBarTerminal } from '../../../../../../shared/workspace-layout/chat-dock-terminal'
 import { queueHookCommandsForFirstWorktreeTab } from '@/lib/workspace/creation/setup/hook-command-delayed-delivery'
 import { resolveWorkspaceTerminalHostAuthority } from '@/lib/workspace/ownership/workspace-terminal-host-authority'
 import { seedNativeChatAppliedSessionOptions } from '../../../../../../shared/native-chat/input/session-options/native-chat-session-option-cache'
@@ -115,7 +116,7 @@ export function ensureWorktreeHasInitialTerminal(
   )
   // Explicit spawn evidence survives new-worktree ownership races; later activations also defer to host-owned terminal creation.
   if (backendStartupTerminalSpawned || hostAuthority === 'live') {
-    const existingTerminalTabId = store.tabsByWorktree[worktreeId]?.[0]?.id
+    const existingTerminalTabId = firstTabBarTerminal(store.tabsByWorktree[worktreeId])?.id
     if (existingTerminalTabId && (setup || issueCommand)) {
       queueSetupAndIssueCommands(
         store,
@@ -198,7 +199,7 @@ export function ensureWorktreeHasInitialTerminal(
   const shouldCreateNewStartupTerminal =
     opts?.createNewTerminalForStartup === true && sequencedStartup !== undefined
   if (!shouldAutoCreate && !shouldCreateForExplicitWork && !shouldCreateNewStartupTerminal) {
-    const existingTerminalTabId = store.tabsByWorktree[worktreeId]?.[0]?.id ?? null
+    const existingTerminalTabId = firstTabBarTerminal(store.tabsByWorktree[worktreeId])?.id ?? null
     const queuedOnExisting = existingTerminalTabId !== null && Boolean(setup || issueCommand)
     // Main can adopt the startup tab yet fail setup spawn; renderer still runs returned fallback
     // setup. Editor- or browser-only workspaces run it in its own tab.

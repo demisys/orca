@@ -1,4 +1,5 @@
 import { useAppStore } from '@/store/index'
+import { firstTabBarTerminal } from '../../../../../../shared/workspace-layout/chat-dock-terminal'
 import type { AgentStartupPlan } from '../../../../../../shared/agent-launch/startup/tui-agent-startup'
 import { parsePaneKey } from '../../../../../../shared/workspace-layout/stable-pane-id'
 import {
@@ -31,7 +32,7 @@ export function resolveAgentStartupTabId(
   return (
     primaryTabId ??
     state.activeTabIdByWorktree[worktreeId] ??
-    state.tabsByWorktree[worktreeId]?.[0]?.id ??
+    firstTabBarTerminal(state.tabsByWorktree[worktreeId])?.id ??
     null
   )
 }

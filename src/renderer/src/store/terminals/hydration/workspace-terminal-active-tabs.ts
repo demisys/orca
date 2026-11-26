@@ -1,4 +1,5 @@
 import type { TerminalTab } from '../../../../../shared/workspace-layout/terminal-tab-types'
+import { firstTabBarTerminal } from '../../../../../shared/workspace-layout/chat-dock-terminal'
 import type { WorkspaceSessionState } from '../../../../../shared/workspace-session/workspace-session-state-types'
 
 /** Restore per-worktree active tab; validate ids when the map exists, else derive for legacy sessions. */
@@ -38,8 +39,9 @@ export function restoreActiveTabIdByWorktree({
       activeTabIdByWorktree[activeWorktreeId] = activeTabId
     }
     for (const [wId, tabs] of Object.entries(tabsByWorktree)) {
-      if (!activeTabIdByWorktree[wId] && tabs.length > 0) {
-        activeTabIdByWorktree[wId] = tabs[0].id
+      const first = firstTabBarTerminal(tabs)
+      if (!activeTabIdByWorktree[wId] && first) {
+        activeTabIdByWorktree[wId] = first.id
       }
     }
   }
