@@ -144,20 +144,17 @@ async function firstHiddenSubmoduleEdit(
     return null
   }
   const { stdout } = await gitExecFileAsync(
-    ['status', '--porcelain=v2', '--untracked-files=no', '--ignore-submodules=none'],
+    // `untracked`, not `none`: `--untracked-files` stops at the parent, and a switch cannot lose
+    // untracked files inside a submodule. The flag still overrides the submodule's `ignore` config.
+    ['status', '--porcelain=v2', '--untracked-files=no', '--ignore-submodules=untracked'],
     execution
   )
   for (const line of stdout.split('\n')) {
-    // `1 XY S<c><m><u> …`: m means tracked edits inside (untracked ones are not listed here and a
-    // switch cannot lose them); a commit mismatch alone is left alone, since checkout never
-    // touches a submodule's working tree.
+    // `1 XY S<c><m><u> …`: m means tracked edits inside; a commit mismatch alone is left alone,
+    // since checkout never touches a submodule's working tree.
     const fields = line.split(' ')
     const sub = fields[2] ?? ''
-    if (
-      (fields[0] === '1' || fields[0] === '2') &&
-      sub.startsWith('S') &&
-      /[MU]/.test(sub.slice(2))
-    ) {
+    if ((fields[0] === '1' || fields[0] === '2') && sub.startsWith('S') && sub[2] === 'M') {
       return fields
         .slice(fields[0] === '1' ? 8 : 9)
         .join(' ')
