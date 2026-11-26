@@ -45,6 +45,7 @@ const ORCA_DIAGNOSTICS_TOKEN_URL_LITERAL =
   typeof orcaDiagnosticsTokenUrl === 'string' && orcaDiagnosticsTokenUrl.length > 0
     ? JSON.stringify(orcaDiagnosticsTokenUrl)
     : 'null'
+const ORCA_UPDATER_DISABLED_LITERAL = JSON.stringify(process.env.ORCA_DISABLE_UPDATER === '1')
 
 const darkBuildSwitches: {
   darkBuildDefines: () => Record<string, string>
@@ -231,6 +232,7 @@ export const electronViteConfig: UserConfig = {
       ORCA_POSTHOG_WRITE_KEY: ORCA_POSTHOG_WRITE_KEY_LITERAL,
       ORCA_DIAGNOSTICS_TOKEN_URL: ORCA_DIAGNOSTICS_TOKEN_URL_LITERAL,
       ORCA_BUILD_COMMIT: ORCA_BUILD_COMMIT_LITERAL,
+      ORCA_UPDATER_DISABLED: ORCA_UPDATER_DISABLED_LITERAL,
       ...DARK_BUILD_DEFINES
     },
     // @xterm/headless declares exports:null; point Vite directly at its published CJS main to permit inlining.

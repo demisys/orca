@@ -1,4 +1,3 @@
-import { app } from 'electron'
 import { isMacInstallRequested } from '../mac-install/updater-mac-install'
 import type { UpdateCheckOptions } from '../../../shared/updater/update-status-types'
 import type { ReleaseChannel } from '../../../shared/updater/release-channel'
@@ -6,6 +5,7 @@ import { updaterCodedMessage } from '../../../shared/updater/updater-failure-cop
 import { managesUpdates } from '../releases/updater-release-policy'
 import { UpdaterScheduling } from './updater-scheduling'
 import { isPendingTeamRestart } from './updater-state'
+import { isUpdaterAvailable } from '../updater-availability'
 
 export abstract class UpdaterMenuChecks extends UpdaterScheduling {
   protected checkForUpdatesFromMenu(options?: UpdateCheckOptions): void {
@@ -19,7 +19,7 @@ export abstract class UpdaterMenuChecks extends UpdaterScheduling {
     ) {
       return
     }
-    if (!app.isPackaged) {
+    if (!isUpdaterAvailable()) {
       this.sendStatus({ state: 'not-available', userInitiated: true })
       return
     }
