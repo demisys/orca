@@ -38,7 +38,7 @@ import type { RepoHeaderProjectActions } from '../rows/repo-header-project-actio
 import { getRepoOwnerWorktreeVisibilityDefaults } from '../../../../store/slices/worktrees/listing/worktree-visibility-defaults-by-host'
 import { renderWorktreeVirtualRow } from '../rows/virtual-row-dispatch'
 import { selectDrawsNewWorktreeCards } from '@/store/appearance/worktree-card-style'
-import { useProjectHighlightBands } from './project-highlight-band-layer'
+import { useProjectHighlight } from './project-highlight-band-layer'
 
 const EMPTY_HOST_OPTIONS: NonNullable<VirtualizedWorktreeViewportProps['hostOptions']> = []
 
@@ -236,7 +236,7 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     shouldSkipScrollAnchorRestore: scrollSuppression.shouldSkipScrollAnchorRestore
   })
 
-  const bandLayer = useProjectHighlightBands(renderRows, groupBy, firstHeaderIndex, virtualization)
+  const highlight = useProjectHighlight(renderRows, groupBy, firstHeaderIndex, virtualization)
 
   const { toggleGroupWithScrollAnchor, getLineageToggleHandler } = useGroupToggleWithScrollAnchor({
     scrollRef,
@@ -362,6 +362,7 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     nativeDrag,
     headerDrag,
     projectHeaderHostContexts,
+    projectHighlight: highlight,
     getCachedFolderWorkspacePathStatus,
     getLineageToggleHandler,
     toggleGroupWithScrollAnchor,
@@ -410,7 +411,7 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
           className="relative w-full"
           style={{ height: `${virtualization.virtualizer.getTotalSize()}px` }}
         >
-          {bandLayer}
+          {highlight.bands}
           {renderWorktreeSidebarDropIndicators({
             headerDrag,
             worktreeDragState: runtime.worktreeDragState

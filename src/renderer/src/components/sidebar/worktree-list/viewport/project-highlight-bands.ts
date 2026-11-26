@@ -1,7 +1,8 @@
 import type { CSSProperties } from 'react'
 import type { WorktreeGroupBy } from '../../../../../../shared/sidebar-list/row-types'
 import { getRenderRowKey, type RenderRow } from '../listing/render-row'
-import { resolveProjectGroupHeaderColor } from '../rows/project-header-color'
+import type { Repo } from '../../../../../../shared/repository/repo-types'
+import { isProjectGroupHeader } from '../rows/project-header-color'
 import { shouldUseHeaderTopSpacing } from './virtual-rows'
 
 const HEADER_TOP_SPACING = 4
@@ -24,37 +25,16 @@ type RowMeasurement = { start: number; end: number }
 
 export type ProjectHighlightStyle = CSSProperties & Record<'--project-highlight-color', string>
 
-/** Pairs with the `.worktree-project-highlight` class in main.css. */
+/** Pairs with the `.worktree-project-highlight` classes in main.css. */
 export function getProjectHighlightStyle(color: string): ProjectHighlightStyle {
   return { '--project-highlight-color': color }
-}
-
-export function getProjectHighlightColorForHeader(
-  row: RenderRow,
-  groupBy: WorktreeGroupBy
-): string | undefined {
-  if (row.type !== 'header' || row.repo?.sidebarHighlight !== true) {
-    return undefined
-  }
-  return resolveProjectGroupHeaderColor({
-    groupBy,
-    headerKey: row.key,
-    badgeColor: row.repo.badgeColor
-  })
-}
-
-export function getProjectHighlightHeaderStyle(
-  row: RenderRow,
-  groupBy: WorktreeGroupBy
-): ProjectHighlightStyle | undefined {
-  const color = getProjectHighlightColorForHeader(row, groupBy)
-  return color ? getProjectHighlightStyle(color) : undefined
 }
 
 /** A highlighted project's section runs from its header to the row before the next header. */
 export function getProjectHighlightSections(
   rows: readonly RenderRow[],
-  groupBy: WorktreeGroupBy
+  groupBy: WorktreeGroupBy,
+  resolveRepoColor: (repo: Repo) => string
 ): ProjectHighlightSection[] {
   const sections: ProjectHighlightSection[] = []
   let open: ProjectHighlightSection | null = null
@@ -67,9 +47,17 @@ export function getProjectHighlightSections(
       continue
     }
     open = null
-    const color = getProjectHighlightColorForHeader(row, groupBy)
-    if (color) {
-      open = { key: getRenderRowKey(row), color, startIndex: index, endIndex: index }
+    if (
+      row.type === 'header' &&
+      row.repo?.sidebarHighlight === true &&
+      isProjectGroupHeader({ groupBy, headerKey: row.key })
+    ) {
+      open = {
+        key: getRenderRowKey(row),
+        color: resolveRepoColor(row.repo),
+        startIndex: index,
+        endIndex: index
+      }
       sections.push(open)
     }
   }

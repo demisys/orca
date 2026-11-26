@@ -42,6 +42,16 @@ export function useRepoMarkAppearance(repo: RepoMarkRepo): RepoMarkAppearance {
   )
 }
 
+/** Resolves the color each project's mark shows, Auto included, from one catalog snapshot. */
+export function useRepoMarkColorResolver(): (repo: RepoMarkRepo) => string {
+  const repos = useAppStore((state) => state.repos)
+  return React.useCallback(
+    (repo) =>
+      appearancesFor(repos).get(repoMarkKey(repo))?.color ?? resolveRepoBadgeColor(repo.badgeColor),
+    [repos]
+  )
+}
+
 /** What Auto would pick for this project right now, so the Auto swatch can preview it. */
 export function useRepoAutoMarkColor(repo: RepoMarkRepo): string {
   const repos = useAppStore((state) => state.repos)

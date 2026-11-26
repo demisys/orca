@@ -1,7 +1,4 @@
-import {
-  getRootProjectHeaderKey,
-  getRootProjectHeaderOccurrenceKey
-} from '../drag/root-project-header-drop'
+import { getRootProjectHeaderOccurrenceKey } from '../drag/root-project-header-drop'
 import React from 'react'
 import { ChevronDown } from 'lucide-react'
 import { ProjectHeaderHostLabel, ProjectHeaderHostTooltip } from './ProjectHeaderHostLabel'
@@ -12,9 +9,7 @@ import { RepoMark } from '@/components/repo/RepoMark'
 import { RepoForkIndicator } from '@/components/repo/repo-fork-indicator'
 
 import '@/store/project-groups/project-group-owner-routing'
-import { getRepoExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
 import {
-  getHeaderDragRepo,
   isSingleHostProjectHeader,
   type GroupHeaderRow
 } from '../../../../../../shared/sidebar-list/row-types'
@@ -24,7 +19,9 @@ import { getWorkspaceStatusFromGroupKey } from '../../../../../../shared/workspa
 import { translateWorkspaceStatusHeaderLabel } from '../../workspace-status/presentation/workspace-board-status-label'
 import { getVirtualRowTransform } from '../viewport/virtual-rows'
 import { getSidebarHeaderVisual } from './header-visuals'
-import { getProjectHighlightHeaderStyle } from '../viewport/project-highlight-bands'
+import { getProjectHighlightStyle } from '../viewport/project-highlight-bands'
+import { renderProjectHighlightStickyBounds } from '../viewport/project-highlight-band-layer'
+import { getRenderRowKey } from '../listing/render-row'
 import { resolveProjectGroupHeaderColor } from './project-header-color'
 import { ProjectHeaderActions } from './ProjectHeaderActions'
 import {
@@ -51,6 +48,7 @@ import {
 } from './header-event-guards'
 import { getWorktreeOptionId } from './option-dom'
 import type { SectionHeaderRowContext } from './section-header-row-context'
+import { getSectionHeaderDragState } from './section-header-drag-state'
 import type { Translate } from '@/i18n/use-translate'
 
 export function renderWorktreeSectionHeaderRow(
@@ -69,68 +67,22 @@ export function renderWorktreeSectionHeaderRow(
   const { headerDrag } = ctx
   const isRepoHeader = ctx.groupBy === 'repo' && row.repo !== undefined
   const isProjectGroupHeader = ctx.groupBy === 'repo' && row.projectGroup !== undefined
-  const usesRootProjectDrag = Boolean(
-    headerDrag.rootProjectHeaderKeys && (row.projectGroupDepth ?? 0) === 0
-  )
-  const headerRepo = isRepoHeader
-    ? usesRootProjectDrag
-      ? (row.anchorRepo ?? row.repo)
-      : getHeaderDragRepo(row)
-    : undefined
-  const projectIdForHeader = headerRepo?.id
-  const projectGroupIdForHeader =
-    isProjectGroupHeader && !row.repo && typeof row.projectGroup?.id === 'string'
-      ? row.projectGroup.id
-      : undefined
-  const projectGroupDragIdForHeader =
-    row.repeated && !usesRootProjectDrag ? undefined : projectGroupIdForHeader
-  // Why: rename/delete must route to the host that owns this row, not to whichever host has focus.
-  const projectGroupHostIdForHeader =
-    row.projectGroup && 'createdFrom' in row.projectGroup
-      ? getRepoExecutionHostId(row.projectGroup)
-      : undefined
-  const repoHeaderIndex = headerRepo && headerDrag.repoHeaderIndexByRepoId.get(headerRepo.id)
-  const repoHeaderBucketKey = headerRepo && headerDrag.repoHeaderBucketByRepoId.get(headerRepo.id)
-  const projectGroupHeaderIndex =
-    projectGroupDragIdForHeader !== undefined
-      ? headerDrag.projectGroupHeaderIndexByGroupId.get(projectGroupDragIdForHeader)
-      : undefined
-  const projectGroupHeaderBucketKey =
-    projectGroupDragIdForHeader !== undefined
-      ? headerDrag.projectGroupHeaderBucketByGroupId.get(projectGroupDragIdForHeader)
-      : undefined
-  const rootProjectHeaderKey = usesRootProjectDrag ? getRootProjectHeaderKey(row) : undefined
-  const rootProjectHeaderCount = rootProjectHeaderKey
-    ? (headerDrag.rootProjectHeaderCountByOccurrenceKey.get(
-        getRootProjectHeaderOccurrenceKey(rootProjectHeaderKey, row.hostId)
-      ) ??
-      headerDrag.rootProjectHeaderCountByOccurrenceKey.get(
-        getRootProjectHeaderOccurrenceKey(rootProjectHeaderKey)
-      ))
-    : undefined
-  const isDraggableRepoHeader = Boolean(
-    headerDrag.canReorderRepoHeaders &&
-    projectIdForHeader &&
-    repoHeaderBucketKey &&
-    (rootProjectHeaderCount !== undefined
-      ? rootProjectHeaderCount > 1
-      : (headerDrag.sidebarRepoHeaderIdsByBucket.get(repoHeaderBucketKey)?.length ?? 0) > 1)
-  )
-  const isDraggableProjectGroupHeader = Boolean(
-    headerDrag.canReorderProjectGroupHeaders &&
-    projectGroupDragIdForHeader &&
-    projectGroupHeaderBucketKey &&
-    (rootProjectHeaderCount !== undefined
-      ? rootProjectHeaderCount > 1
-      : (headerDrag.sidebarProjectGroupHeaderIdsByBucket.get(projectGroupHeaderBucketKey)?.length ??
-          0) > 1)
-  )
-  const isDraggingThis =
-    headerDrag.canReorderRepoHeaders &&
-    headerDrag.repoDrag.state.draggingRepoId === projectIdForHeader
-  const isDraggingThisProjectGroup =
-    headerDrag.canReorderProjectGroupHeaders &&
-    headerDrag.projectGroupDrag.state.draggingGroupId === projectGroupDragIdForHeader
+  const {
+    headerRepo,
+    projectIdForHeader,
+    projectGroupIdForHeader,
+    projectGroupDragIdForHeader,
+    projectGroupHostIdForHeader,
+    repoHeaderIndex,
+    repoHeaderBucketKey,
+    projectGroupHeaderIndex,
+    projectGroupHeaderBucketKey,
+    rootProjectHeaderKey,
+    isDraggableRepoHeader,
+    isDraggableProjectGroupHeader,
+    isDraggingThis,
+    isDraggingThisProjectGroup
+  } = getSectionHeaderDragState({ row, headerDrag, isRepoHeader, isProjectGroupHeader })
   const headerWorkspaceStatus =
     ctx.groupBy === 'workspace-status'
       ? getWorkspaceStatusFromGroupKey(row.key, ctx.workspaceStatuses)
@@ -148,7 +100,9 @@ export function renderWorktreeSectionHeaderRow(
     headerKey: row.key,
     badgeColor: row.repo?.badgeColor
   })
-  const bandStyle = getProjectHighlightHeaderStyle(row, ctx.groupBy)
+  const highlightKey = getRenderRowKey(row)
+  const highlightColor = ctx.projectHighlight?.colorByHeaderKey.get(highlightKey)
+  const bandStyle = highlightColor ? getProjectHighlightStyle(highlightColor) : undefined
   const folderBackedProjectGroup =
     isProjectGroupHeader &&
     !row.repo &&
@@ -171,7 +125,7 @@ export function renderWorktreeSectionHeaderRow(
   const showHeaderCollapseAffordance =
     row.count > 0 &&
     (isRepoHeader || isProjectGroupHeader || headerWorkspaceStatus !== null || isPinnedHeader)
-  return (
+  const headerRow = (
     <div
       key={vItem.key}
       role="presentation"
@@ -188,8 +142,8 @@ export function renderWorktreeSectionHeaderRow(
         args.hasHeaderTopSpacing && !isActiveStickyHeader && 'pt-1',
         isActiveStickyHeader
           ? cn(
-              'sticky z-20',
-              bandStyle ? 'worktree-project-highlight' : 'bg-worktree-sidebar',
+              'sticky z-20 bg-worktree-sidebar',
+              bandStyle && 'worktree-project-highlight-sticky pointer-events-auto',
               // Why: when a host card is pinned, the group tier pins flush beneath it, not at the viewport top.
               args.hasStickyHost ? 'top-[35px]' : '-top-px'
             )
@@ -409,4 +363,15 @@ export function renderWorktreeSectionHeaderRow(
       </ProjectHeaderHostTooltip>
     </div>
   )
+  if (!bandStyle) {
+    return headerRow
+  }
+  return renderProjectHighlightStickyBounds({
+    key: vItem.key,
+    start: vItem.start,
+    sectionBottom: isActiveStickyHeader
+      ? ctx.projectHighlight?.bottomByHeaderKey.get(highlightKey)
+      : undefined,
+    header: headerRow
+  })
 }

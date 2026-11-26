@@ -2091,14 +2091,66 @@ html.native-shell .app-layout {
   background: color-mix(in srgb, var(--sidebar-accent) 40%, transparent);
 }
 
-/* Why: opaque mix over the sidebar fill so a pinned sticky header hides rows
-   scrolling beneath it while matching the band behind the project. */
-.worktree-project-highlight {
-  background: color-mix(in srgb, var(--project-highlight-color) 9%, var(--worktree-sidebar));
+/* Why: opaque fill so a pinned header hides rows scrolling beneath it. */
+.worktree-project-highlight,
+.worktree-project-highlight-sticky {
+  --project-highlight-fill: color-mix(
+    in srgb,
+    var(--project-highlight-color) 3%,
+    var(--worktree-sidebar)
+  );
+  --project-highlight-border: color-mix(
+    in srgb,
+    var(--project-highlight-color) 18%,
+    var(--worktree-sidebar-border)
+  );
 }
 
-.dark .worktree-project-highlight {
-  background: color-mix(in srgb, var(--project-highlight-color) 14%, var(--worktree-sidebar));
+.dark .worktree-project-highlight,
+.dark .worktree-project-highlight-sticky {
+  --project-highlight-fill: color-mix(
+    in srgb,
+    var(--project-highlight-color) 4%,
+    var(--worktree-sidebar)
+  );
+  --project-highlight-border: color-mix(
+    in srgb,
+    var(--project-highlight-color) 22%,
+    var(--worktree-sidebar-border)
+  );
+}
+
+/* Why: the inset shadow is the project-color spine, clipped to the rounded corners. */
+.worktree-project-highlight {
+  background: var(--project-highlight-fill);
+  border: 1px solid var(--project-highlight-border);
+  border-radius: var(--radius-xl);
+  box-shadow: inset 3px 0 0 var(--project-highlight-color);
+}
+
+/* Why: a pinned header continues the band's top edge across the scroll gutters,
+   above the band but under the header's own content. */
+.worktree-project-highlight-sticky::before {
+  content: '';
+  position: absolute;
+  inset: 0 -4px;
+  z-index: -1;
+  background: var(--project-highlight-fill);
+  border: 1px solid var(--project-highlight-border);
+  /* Why: the first header counts as pinned at rest, where a divider would set it apart. */
+  border-bottom-width: 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  box-shadow: inset 3px 0 0 var(--project-highlight-color);
+}
+
+/* Why: square opaque backdrop under the rounded top so the band scrolling beneath
+   doesn't show through the corners in the side gutters. */
+.worktree-project-highlight-sticky::after {
+  content: '';
+  position: absolute;
+  inset: 0 -4px;
+  z-index: -2;
+  background: var(--worktree-sidebar);
 }
 
 /* Why: one multi-selected look for every list on the card surface (workspaces and

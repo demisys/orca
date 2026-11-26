@@ -17,18 +17,19 @@ export function resolveRepoHeaderColor(badgeColor: string | null | undefined): s
   return REPO_COLORS.find((repoColor) => repoColor === normalizedBadgeColor) ?? normalizedBadgeColor
 }
 
+// Pinned and folder headers must not inherit project colors just because grouping is by repo.
+export function isProjectGroupHeader(args: { groupBy: string; headerKey: string }): boolean {
+  return (
+    args.groupBy === 'repo' &&
+    (args.headerKey.startsWith(PROJECT_GROUP_HEADER_KEY_PREFIX) ||
+      args.headerKey.startsWith(PROVIDER_PROJECT_HEADER_KEY_PREFIX))
+  )
+}
+
 export function resolveProjectGroupHeaderColor(args: {
   groupBy: string
   headerKey: string
   badgeColor: string | null | undefined
 }): string | undefined {
-  // Pinned and folder headers must not inherit project colors just because grouping is by repo.
-  if (
-    args.groupBy !== 'repo' ||
-    (!args.headerKey.startsWith(PROJECT_GROUP_HEADER_KEY_PREFIX) &&
-      !args.headerKey.startsWith(PROVIDER_PROJECT_HEADER_KEY_PREFIX))
-  ) {
-    return undefined
-  }
-  return resolveRepoHeaderColor(args.badgeColor)
+  return isProjectGroupHeader(args) ? resolveRepoHeaderColor(args.badgeColor) : undefined
 }

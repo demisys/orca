@@ -10,10 +10,12 @@ import type { WorktreeGroupBy } from '../../../../../../shared/sidebar-list/row-
 import type { WorktreeSidebarHeaderDrag } from '../drag/use-header-drag'
 import type { ProjectHeaderHostContext } from './project-header-host-context'
 import type { RepoHeaderProjectActions } from './repo-header-project-actions'
+import type { ProjectHighlightLookup } from '../viewport/project-highlight-band-layer'
 
 export type SectionHeaderRowContext = {
   groupBy: WorktreeGroupBy
   projectHeaderHostContexts?: ReadonlyMap<string, ProjectHeaderHostContext>
+  projectHighlight?: ProjectHighlightLookup
   collapsedGroups: Set<string>
   workspaceStatuses: readonly WorkspaceStatusDefinition[]
   projectGroups: readonly ProjectGroup[]

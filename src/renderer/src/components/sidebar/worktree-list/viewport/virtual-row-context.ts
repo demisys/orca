@@ -19,6 +19,7 @@ import type { WorktreeVirtualRowContext } from '../rows/virtual-row-dispatch'
 import type { RepoHeaderProjectActions } from '../rows/repo-header-project-actions'
 
 import type { ProjectHeaderHostContext } from '../rows/project-header-host-context'
+import type { ProjectHighlightLookup } from './project-highlight-band-layer'
 
 type BuildArgs = {
   props: VirtualizedWorktreeViewportProps
@@ -41,6 +42,7 @@ type BuildArgs = {
   statusDrag: ReturnType<typeof useWorkspaceStatusRowDrag>
   nativeDrag: ReturnType<typeof useWorktreeNativeDrag>
   projectHeaderHostContexts: ReadonlyMap<string, ProjectHeaderHostContext>
+  projectHighlight: ProjectHighlightLookup
   headerDrag: WorktreeSidebarHeaderDrag
   getCachedFolderWorkspacePathStatus: ReturnType<typeof useFolderWorkspacePathStatusRows>
   getLineageToggleHandler: (groupKey: string) => LineageToggleHandler
@@ -91,6 +93,7 @@ export function buildWorktreeVirtualRowContext(args: BuildArgs): WorktreeVirtual
       pinDragOver: runtime.pinDragOver,
       headerDrag,
       projectHeaderHostContexts: args.projectHeaderHostContexts,
+      projectHighlight: args.projectHighlight,
       getCachedFolderWorkspacePathStatus: args.getCachedFolderWorkspacePathStatus,
       toggleGroupWithScrollAnchor: args.toggleGroupWithScrollAnchor,
       toggleAllProjects: props.onToggleAllProjects,
