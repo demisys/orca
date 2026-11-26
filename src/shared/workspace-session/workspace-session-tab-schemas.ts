@@ -46,6 +46,11 @@ export const terminalTabSchema = lazyZodSchema(() =>
     launchAgent: z
       .custom<TuiAgent>((v) => isTuiAgent(v))
       .optional()
+      .catch(undefined),
+    // A malformed dock drops to an ordinary terminal rather than rejecting the session.
+    chatDock: z
+      .object({ ownerTabId: z.string().min(1) })
+      .optional()
       .catch(undefined)
   })
 )

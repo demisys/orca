@@ -410,6 +410,7 @@ export const NativeChatComposerPane = forwardRef<ComposerHandle, C.NativeChatCom
             agent={agent}
             launchPrompt={launchPrompt}
             workspaceFooter={workspaceFooter}
+            chatTabId={terminalTabId}
             {...fieldOverrides}
           />
         </NativeChatComposerRoomProvider>

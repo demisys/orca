@@ -38,6 +38,7 @@ import {
   replaceRecordEntries,
   replaceTabBuckets
 } from '../../record-transitions/keyed-record-transitions'
+import { closeChatDockTerminalsOwnedBy } from '../../terminals/tabs/creation/chat-dock-terminal-creation'
 
 export function createTabsCloseActions(
   set: TabsSliceSet,
@@ -117,6 +118,9 @@ export function createTabsCloseActions(
           console.warn('[structured-agent-session] close found no owning host', tab.entityId)
         }
         // The unsent draft stays: it belongs to the conversation, which can be reopened from history.
+      }
+      if (tab.contentType === 'agent-session') {
+        closeChatDockTerminalsOwnedBy(get, tab.id)
       }
       const nextActiveTabId =
         group?.activeTabId === tabId

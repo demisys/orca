@@ -100,6 +100,8 @@ export type TerminalActions = {
       forceHostRuntime?: boolean
     }
   ) => TerminalTab
+  /** The chat's docked shell, created on first use; it has no tab-bar entry. */
+  createChatDockTerminal: (worktreeId: string, ownerTabId: string) => TerminalTab
   openNewTerminalTabInActiveWorkspace: (groupId: string) => Promise<void>
   /** Synchronous retirement: provider teardown starts before state removal but is never awaited. */
   closeTab: (

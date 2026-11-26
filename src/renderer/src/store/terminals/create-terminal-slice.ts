@@ -4,6 +4,7 @@ import type { TerminalSlice, TerminalStoreGet } from './terminal-state'
 
 import { createTerminalEphemeralActions } from './terminal-ephemeral-state'
 import { createTerminalTabCreationActions } from './tabs/creation/terminal-tab-creation'
+import { createChatDockTerminalActions } from './tabs/creation/chat-dock-terminal-creation'
 import { createTerminalTabAgentLaunchPaneActions } from './tabs/creation/terminal-tab-agent-launch-pane'
 import { createActiveWorkspaceTerminalActions } from './tabs/creation/terminal-active-workspace-creation'
 import { createTerminalTabCloseActions } from './retirement/terminal-tab-close'
@@ -81,6 +82,7 @@ export const createTerminalSlice: (
   recentQuickCommandIdByGroup: {},
   ...createTerminalEphemeralActions(set, get, isClaudeAgent),
   ...createTerminalTabCreationActions(set, get, api.subscribe),
+  ...createChatDockTerminalActions(set, get),
   ...createTerminalTabAgentLaunchPaneActions(set),
   ...createActiveWorkspaceTerminalActions(set, get),
   ...createTerminalTabCloseActions(set, get),

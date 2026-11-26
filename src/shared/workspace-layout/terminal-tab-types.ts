@@ -83,6 +83,8 @@ export type TerminalTab = {
   restoredFromSession?: true
   /** Never persist in-flight recovery: stale ledgers would refuse valid post-restart recovery. Sanitize like pendingActivationSpawn. */
   recovery?: TerminalTabRecoveryLedger
+  /** A shell docked in a chat's composer: no tab-bar entry, closed with the chat tab it names. */
+  chatDock?: { ownerTabId: string }
 }
 
 export type TerminalPaneSplitDirection = 'vertical' | 'horizontal'

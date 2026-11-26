@@ -65,7 +65,8 @@ export function getOrphanTerminalIds(
   return new Set(
     runtimeTabs
       .filter((tab) => {
-        if (unifiedTerminalEntityIds.has(tab.id)) {
+        // A chat-docked shell has no tab-bar entry by design; its chat tab owns its lifetime.
+        if (unifiedTerminalEntityIds.has(tab.id) || tab.chatDock) {
           return false
         }
         // Host loss can emit synthetic exit; missing PTY alone cannot prove user closure. Keep until replacement or explicit close.

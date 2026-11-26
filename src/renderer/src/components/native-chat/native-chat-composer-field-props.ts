@@ -88,6 +88,8 @@ export type NativeChatComposerFieldProps = {
   agent?: string
   launchPrompt?: { placeholder: string }
   workspaceFooter?: React.ReactNode
+  /** The chat tab a docked shell belongs to; absent where the composer has none. */
+  chatTabId?: string
   /** Send opens `/btw` and `/side` drafts as side chats here. */
   sideChat?: boolean
 }

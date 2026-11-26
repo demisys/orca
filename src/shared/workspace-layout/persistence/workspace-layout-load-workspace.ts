@@ -116,6 +116,10 @@ function loadTabs(args: WorkspaceReadArgs): {
       title: entry?.label ?? row.title,
       ...pickStoredFields(row, ['generation'])
     }
+    // A chat-docked shell has no tab-bar place; its chat portals it in.
+    if (row.chatDock) {
+      return
+    }
     candidates.push({
       id: tab.id,
       groupId: entry?.groupId,

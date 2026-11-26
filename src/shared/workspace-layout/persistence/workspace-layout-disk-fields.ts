@@ -133,7 +133,8 @@ const ROW = {
   pendingActivationSpawn: 'unwritten',
   recovery: 'unwritten',
   restoredFromSession: 'unwritten',
-  sessionTitleFromHost: 'unwritten'
+  sessionTitleFromHost: 'unwritten',
+  chatDock: own('tab.terminal', 'chatDock')
 } as const satisfies Record<keyof TerminalTab, DiskFieldWritten>
 
 const ENTRY_FIELDS = {

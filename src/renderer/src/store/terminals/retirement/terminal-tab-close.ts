@@ -27,6 +27,7 @@ import { settleAgentLaunchPaneStart } from '@/lib/agent-session/launch/pane/agen
 import { settleAttentionRemovedBy } from '../../slices/workspace-attention/attention-removal-follow-up'
 import { runAsAutomaticDeselection } from '../../workspaces/selection/active-worktree-deselection-intent'
 import { recordDraft, tabBucketDraft } from '../../record-transitions/keyed-record-transitions'
+import { closeChatDockTerminalsOwnedBy } from '../tabs/creation/chat-dock-terminal-creation'
 
 export function createTerminalTabCloseActions(
   set: TerminalStoreSet,
@@ -190,7 +191,7 @@ export function createTerminalTabCloseActions(
             if (nextActiveTabIdByWorktree === s.activeTabIdByWorktree) {
               nextActiveTabIdByWorktree = { ...s.activeTabIdByWorktree }
             }
-            nextActiveTabIdByWorktree[wId] = tabs[0]?.id ?? null
+            nextActiveTabIdByWorktree[wId] = tabs.find((tab) => !tab.chatDock)?.id ?? null
           }
           // Why: keep tabBarOrderByWorktree in sync so stale terminal IDs don't linger and shift positions on later tab operations.
           let nextTabBarOrderByWorktree: Record<string, string[]> = s.tabBarOrderByWorktree
@@ -309,6 +310,7 @@ export function createTerminalTabCloseActions(
           }
         }
       }
+      closeChatDockTerminalsOwnedBy(get, tabId)
     }
   }
 }

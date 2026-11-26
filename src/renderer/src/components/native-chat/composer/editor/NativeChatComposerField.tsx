@@ -12,6 +12,12 @@ import {
   type NativeChatComposeTarget
 } from '../compose-panel/NativeChatComposePanel'
 import { NativeChatComposerNotices } from '../controls/NativeChatComposerNotices'
+import {
+  NativeChatTerminalPanel,
+  setNativeChatTerminalPanelOpen,
+  useNativeChatTerminalDock,
+  useNativeChatTerminalPanelOpen
+} from '../terminal-panel/NativeChatTerminalPanel'
 import { NativeChatImageAttachmentPreview } from '../../attachments/chips/NativeChatImageAttachmentPreview'
 
 import { useNativeChatComposerDraftUnsaved } from '../../drafts/use-native-chat-draft-unsaved'
@@ -85,6 +91,7 @@ export function NativeChatComposerField({
   agent,
   launchPrompt,
   workspaceFooter,
+  chatTabId,
   sideChat
 }: NativeChatComposerFieldProps): React.JSX.Element {
   const t = useTranslate()
@@ -205,6 +212,21 @@ export function NativeChatComposerField({
   })
   // A launch prompt sits in a popover, so it takes the app's surface instead of the chat's.
   const launch = launchPrompt !== undefined
+  const terminalDock = useNativeChatTerminalDock(editSession || launch ? undefined : chatTabId)
+  const terminalOpen = useNativeChatTerminalPanelOpen(terminalDock?.ownerTabId)
+  const toggleTerminal = useLatestHandler(() => {
+    if (terminalDock) {
+      setNativeChatTerminalPanelOpen(terminalDock.ownerTabId, !terminalOpen)
+      if (terminalOpen) {
+        textareaRef.current?.focus()
+      }
+    }
+  })
+  const closeTerminal = useLatestHandler(() => {
+    if (terminalDock) {
+      setNativeChatTerminalPanelOpen(terminalDock.ownerTabId, false)
+    }
+  })
   const card = useRef<HTMLDivElement>(null)
 
   return (
@@ -241,6 +263,13 @@ export function NativeChatComposerField({
             )}
             className="mb-1.5"
           />
+          {terminalDock && terminalOpen ? (
+            <NativeChatTerminalPanel
+              key={terminalDock.ownerTabId}
+              dock={terminalDock}
+              onClose={closeTerminal}
+            />
+          ) : null}
           <NativeChatComposePanel
             key={draftScopeKey}
             target={composeTarget}
@@ -354,6 +383,8 @@ export function NativeChatComposerField({
                 isDictationHoldMode={isDictationHoldMode}
                 onAttach={attach}
                 onCompose={editSession || disabled ? undefined : toggleCompose}
+                terminalOpen={terminalOpen}
+                onToggleTerminal={terminalDock ? toggleTerminal : undefined}
                 onDictationToggle={dictationToggle}
                 onDictationHoldStart={dictationHoldStart}
                 onDictationHoldEnd={dictationHoldEnd}

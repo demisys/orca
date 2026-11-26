@@ -22,6 +22,7 @@ import { NativeChatComposerPermissionPicker } from '../../session/options/contro
 import { NativeChatComposerGoalChip } from './NativeChatComposerGoalChip'
 import { NativeChatComposerPrimaryButton } from './NativeChatComposerPrimaryButton'
 import { NativeChatAttachButton } from './NativeChatAttachButton'
+import { NativeChatTerminalButton } from '../terminal-panel/NativeChatTerminalButton'
 import { NativeChatComposeButton } from '../compose-panel/NativeChatComposeButton'
 import { NativeChatDictationButton } from './NativeChatDictationButton'
 import { NativeChatContextUsageRing } from '../../usage/NativeChatContextUsageRing'
@@ -50,6 +51,9 @@ export type NativeChatComposerActionsProps = {
   onAttach: () => void
   /** Toggles the compose panel; absent where the composer has none. */
   onCompose?: () => void
+  /** Shows or hides the chat's docked shell; absent where the chat has none. */
+  onToggleTerminal?: () => void
+  terminalOpen?: boolean
   onDictationToggle: () => void
   onDictationHoldStart: () => void
   onDictationHoldEnd: () => void
@@ -88,6 +92,8 @@ export const NativeChatComposerActions = memo(function NativeChatComposerActions
   isDictationHoldMode,
   onAttach,
   onCompose,
+  onToggleTerminal,
+  terminalOpen = false,
   onDictationToggle,
   onDictationHoldStart,
   onDictationHoldEnd,
@@ -212,6 +218,24 @@ export const NativeChatComposerActions = memo(function NativeChatComposerActions
                 onCompose={() => {
                   close()
                   onCompose()
+                }}
+              />
+            )
+          }
+        ]
+      : []),
+    ...(onToggleTerminal
+      ? [
+          {
+            id: 'terminal',
+            priority: 3,
+            content: <NativeChatTerminalButton open={terminalOpen} onToggle={onToggleTerminal} />,
+            overflow: (close: () => void) => (
+              <NativeChatTerminalButton
+                open={terminalOpen}
+                onToggle={() => {
+                  close()
+                  onToggleTerminal()
                 }}
               />
             )

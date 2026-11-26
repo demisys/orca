@@ -26,10 +26,14 @@ import {
 } from '../workspace-layout-model'
 import { retireExitedSurface } from '../commands/workspace-layout-removal'
 
+// Then tabs outside the tab bar (chat-docked shells), as saveWorkspace orders them.
 function terminalTabsInOrder(model: WorkspaceLayoutModel) {
-  return Object.values(model.workspaces).flatMap((workspace) =>
-    tabsInOrder(workspace).flatMap((tab) => (tab.kind === 'terminal' ? [{ workspace, tab }] : []))
-  )
+  return Object.values(model.workspaces).flatMap((workspace) => {
+    const ordered = tabsInOrder(workspace)
+    return [...ordered, ...workspace.tabs.filter((tab) => !ordered.includes(tab))].flatMap((tab) =>
+      tab.kind === 'terminal' ? [{ workspace, tab }] : []
+    )
+  })
 }
 
 type Remint = {

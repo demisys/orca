@@ -23201,6 +23201,12 @@
         "title": "Compose prompt",
         "resize": "Resize compose panel",
         "toolbarLabel": "Prompt formatting"
+      },
+      "terminal": {
+        "hide": "Hide shell",
+        "show": "Show shell",
+        "title": "Shell",
+        "resize": "Resize shell"
       }
     },
     "tab": {

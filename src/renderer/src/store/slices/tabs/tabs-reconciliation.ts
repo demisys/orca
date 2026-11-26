@@ -53,7 +53,8 @@ export function projectWorktreeTabModelReconciliation(
     unifiedTabs.filter((tab) => tab.contentType === 'terminal').map((tab) => tab.entityId)
   )
   const legacyRuntimeTerminalTabs = runtimeTerminalTabs.filter((tab) => {
-    if (unifiedTerminalEntityIds.has(tab.id)) {
+    // A chat-docked shell stays out of the tab bar even though it has a live PTY.
+    if (unifiedTerminalEntityIds.has(tab.id) || tab.chatDock) {
       return false
     }
     // Reconnect or unverified host-loss evidence keeps legacy tabs live until replacement binds or user closes them.
