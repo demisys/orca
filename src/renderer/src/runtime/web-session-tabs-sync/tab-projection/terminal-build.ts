@@ -211,7 +211,9 @@ export function buildMirroredTerminalTabs(
         sortOrder: sortOffset + index,
         createdAt: existing?.createdAt ?? now + index,
         // Why: launchAgent is host-owned lifecycle metadata; once the host omits it, don't resurrect stale startup intent.
-        ...(launchAgent ? { launchAgent } : {})
+        ...(launchAgent ? { launchAgent } : {}),
+        // The host knows nothing of chat docks; keep the client's flag or the shell surfaces as a plain tab.
+        ...(existing?.chatDock ? { chatDock: existing.chatDock } : {})
       },
       hostTabId: parentTabId,
       ptyIds,

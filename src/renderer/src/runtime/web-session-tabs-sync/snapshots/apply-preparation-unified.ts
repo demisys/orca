@@ -3,6 +3,10 @@ import { buildTerminalUnifiedTab } from '../tab-projection/tab-builders'
 import { isAgentSessionTab } from '../tab-projection/terminal-surfaces'
 import { toWebTerminalSurfaceTabId } from '../../../../../shared/workspace-layout/terminal-surface-id'
 import {
+  firstTabBarTerminal,
+  isAttachedChatDock
+} from '../../../../../shared/workspace-layout/chat-dock-terminal'
+import {
   resolveWebSessionSiblingVisibleTabId,
   resolveWebSessionVisibleTabId
 } from '../navigation/web-session-focus-intent'
@@ -41,7 +45,16 @@ export function prepareWebSessionTabsSnapshotUnified(
     directlyOpened,
     framePublishesDirectChat
   } = base
-  const mirroredTerminalUnifiedTabs = mirroredTerminalTabs.map((entry) =>
+  const mirroredBrowserUnifiedTabs = mirroredBrowserTabs.map((entry) => entry.unifiedTab)
+  const mirroredEditorUnifiedTabs = mirroredEditorTabs.map((entry) => entry.unifiedTab)
+  const mirroredAgentUnifiedTabs = mirroredAgentTabs.map((entry) => entry.unifiedTab)
+  // A docked shell portals into its chat, so it gets no tab-bar entry while that chat is open.
+  const chatDockOwners = [...retainedUnifiedTabs, ...mirroredAgentUnifiedTabs]
+  const tabBarTerminalTabs = mirroredTerminalTabs.filter(
+    (entry) => !isAttachedChatDock(entry.tab, chatDockOwners)
+  )
+  const tabBarTerminalIds = new Set(tabBarTerminalTabs.map((entry) => entry.tab.id))
+  const mirroredTerminalUnifiedTabs = tabBarTerminalTabs.map((entry) =>
     buildTerminalUnifiedTab(
       entry.tab,
       hostGroupIdByTabId.get(entry.hostTabId) ?? targetGroupId,
@@ -49,9 +62,6 @@ export function prepareWebSessionTabsSnapshotUnified(
       entry.tab.viewMode ?? existingViewModeByTabId.get(entry.tab.id)
     )
   )
-  const mirroredBrowserUnifiedTabs = mirroredBrowserTabs.map((entry) => entry.unifiedTab)
-  const mirroredEditorUnifiedTabs = mirroredEditorTabs.map((entry) => entry.unifiedTab)
-  const mirroredAgentUnifiedTabs = mirroredAgentTabs.map((entry) => entry.unifiedTab)
   const mirroredUnifiedTabs = [
     ...mirroredTerminalUnifiedTabs,
     ...mirroredBrowserUnifiedTabs,
@@ -75,9 +85,13 @@ export function prepareWebSessionTabsSnapshotUnified(
     terminalSurfaceTabs.find((tab) => tab.id === activeHostTerminalId)?.parentTabId ??
     terminalSurfaceTabs.find((tab) => tab.isActive)?.parentTabId ??
     null
-  const activeMirroredTerminalId = activeHostTerminalId
+  const activeHostTerminalLocalId = activeHostTerminalId
     ? toWebTerminalSurfaceTabId(activeHostTerminalParentId ?? activeHostTerminalId)
     : null
+  const activeMirroredTerminalId =
+    activeHostTerminalLocalId && tabBarTerminalIds.has(activeHostTerminalLocalId)
+      ? activeHostTerminalLocalId
+      : null
   const activeHostBrowser =
     readyBrowserTabs.find((tab) => tab.id === snapshot.activeTabId) ??
     readyBrowserTabs.find((tab) => tab.isActive) ??
@@ -140,10 +154,10 @@ export function prepareWebSessionTabsSnapshotUnified(
     intentTerminalId ??
     currentActiveTerminalStillExists ??
     (snapshot.activeTabType === 'terminal'
-      ? (activeMirroredTerminalId ?? mirroredTerminalTabEntries[0]?.id)
-      : mirroredTerminalTabEntries[0]?.id) ??
+      ? (activeMirroredTerminalId ?? tabBarTerminalTabs[0]?.tab.id)
+      : tabBarTerminalTabs[0]?.tab.id) ??
     // Another runtime's terminals can outlive this frame's own (#31983).
-    nextTerminalTabs?.[0]?.id ??
+    firstTabBarTerminal(nextTerminalTabs ?? undefined)?.id ??
     null
   const currentActiveBrowserStillExists =
     state.activeBrowserTabIdByWorktree[worktreeId] &&
