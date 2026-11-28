@@ -19,20 +19,6 @@ export function findChatDockTerminal(
   )
 }
 
-/** Retires the shells docked in a chat tab that is closing. */
-export function closeChatDockTerminalsOwnedBy(get: TerminalStoreGet, ownerTabId: string): void {
-  const docked = Object.values(get().tabsByWorktree).flatMap((tabs) =>
-    tabs.filter((tab) => tab.chatDock?.ownerTabId === ownerTabId)
-  )
-  for (const tab of docked) {
-    get().closeTab(tab.id, {
-      reason: 'cleanup',
-      recordInteraction: false,
-      captureRecentlyClosed: false
-    })
-  }
-}
-
 /** A terminal row without a tab-bar entry: the workspace mounts it and a chat portals it in. */
 export function createChatDockTerminalActions(
   set: TerminalStoreSet,

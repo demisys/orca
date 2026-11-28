@@ -53,7 +53,8 @@ export async function tearDownRemovedWorktreeRendererState(args: {
     if (tab.contentType === 'agent-session') {
       get().closeUnifiedTab(tab.id, {
         preserveWorktreeSelection: true,
-        recordInteraction: false
+        recordInteraction: false,
+        reason: 'cleanup'
       })
     }
   }

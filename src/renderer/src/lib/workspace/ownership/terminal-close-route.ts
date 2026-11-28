@@ -3,6 +3,7 @@ import { getPtyExecutionHost } from '../../../../../shared/terminal/pty/lifecycl
 import type { AppState } from '@/store/types'
 import { collectPtyIdsForTab } from '@/store/terminals/retirement/terminal-tab-retirement'
 import { resolveTerminalWorktreeRoute, type TerminalWorktreeRoute } from './terminal-worktree-route'
+import { findChatDockOwnerTab } from '../../../../../shared/workspace-layout/chat-dock-terminal'
 
 function routeForHost(hostId: string | null | undefined): TerminalWorktreeRoute | null {
   const host = parseExecutionHostId(hostId)
@@ -38,9 +39,14 @@ export function resolveTerminalCloseRoute(
     const [host] = ptyHosts
     return ptyHosts.size === 1 && host !== 'foreign' ? routeForHost(host) : null
   }
-  const unified = state.unifiedTabsByWorktree?.[worktreeId]?.find(
-    (tab) =>
-      tab.contentType === 'terminal' && (tab.entityId === terminalTabId || tab.id === terminalTabId)
-  )
+  const unifiedTabs = state.unifiedTabsByWorktree?.[worktreeId]
+  // A docked shell runs where its chat runs; once the chat is gone it has a tab of its own.
+  const unified =
+    (row?.chatDock && findChatDockOwnerTab(unifiedTabs, row.chatDock.ownerTabId)) ||
+    unifiedTabs?.find(
+      (tab) =>
+        tab.contentType === 'terminal' &&
+        (tab.entityId === terminalTabId || tab.id === terminalTabId)
+    )
   return routeForHost(unified?.executionHostId)
 }

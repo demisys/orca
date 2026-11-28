@@ -11,6 +11,7 @@ import {
 } from '@/lib/workspace/tabs/tab-type-cycle'
 import { activateCycledTabOnOwner } from '@/lib/workspace/tabs/cycled-tab-owner-activation'
 import { cancelPendingBotThreadOpen } from '@/lib/agent-session/open/bot-thread-open-lifecycle'
+import { isAttachedChatDock } from '../../../../../shared/workspace-layout/chat-dock-terminal'
 
 type AppStoreState = ReturnType<typeof useAppStore.getState>
 
@@ -132,7 +133,10 @@ export function handleSwitchTabAcrossAllTypes(direction: number): boolean {
 
 /** Build a stable worktree-wide terminal order for a temporarily incomplete group projection. */
 function getWorktreeTerminalTabOrder(store: AppStoreState, worktreeId: string): TypeCyclableTab[] {
-  const runtimeTabs = store.tabsByWorktree?.[worktreeId] ?? []
+  // A shell docked in an open chat has no tab-bar entry to cycle to.
+  const runtimeTabs = (store.tabsByWorktree?.[worktreeId] ?? []).filter(
+    (tab) => !isAttachedChatDock(tab, store.unifiedTabsByWorktree?.[worktreeId])
+  )
   const unifiedTerminalTabs = (store.unifiedTabsByWorktree?.[worktreeId] ?? []).filter(
     (tab) => tab.contentType === 'terminal'
   )

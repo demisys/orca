@@ -99,7 +99,8 @@ function placeBotHomeTabsOnce(store: StoreApi<AppState>): void {
         store.getState().closeUnifiedTab(duplicate.id, {
           preserveAgentSession: true,
           preserveWorktreeSelection: true,
-          recordInteraction: false
+          recordInteraction: false,
+          reason: 'cleanup'
         })
       }
       for (const tab of tabs) {

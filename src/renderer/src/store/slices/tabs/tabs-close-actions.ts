@@ -38,7 +38,7 @@ import {
   replaceRecordEntries,
   replaceTabBuckets
 } from '../../record-transitions/keyed-record-transitions'
-import { closeChatDockTerminalsOwnedBy } from '../../terminals/tabs/creation/chat-dock-terminal-creation'
+import { closeChatDockTerminalsOwnedBy } from '../../terminals/retirement/chat-dock-terminal-close'
 
 export function createTabsCloseActions(
   set: TabsSliceSet,
@@ -119,8 +119,9 @@ export function createTabsCloseActions(
         }
         // The unsent draft stays: it belongs to the conversation, which can be reopened from history.
       }
-      if (tab.contentType === 'agent-session') {
-        closeChatDockTerminalsOwnedBy(get, tab.id)
+      // Any chat surface can dock a shell, rooms included; a terminal's close retires its own docks.
+      if (tab.contentType !== 'terminal') {
+        closeChatDockTerminalsOwnedBy(get, tab.id, opts?.reason ?? 'user')
       }
       const nextActiveTabId =
         group?.activeTabId === tabId

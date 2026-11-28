@@ -124,9 +124,10 @@ export function buildOrphanTerminalCompanionCleanupPatch(
     }
   }
 
-  const firstKeptTab = keptTabs
-    ? keptTabs[0]
-    : (state.tabsByWorktree[worktreeId] ?? []).find((tab) => !orphanTerminalIds.has(tab.id))
+  // A docked shell never becomes the workspace's active terminal.
+  const firstKeptTab = (keptTabs ?? state.tabsByWorktree[worktreeId] ?? []).find(
+    (tab) => !tab.chatDock && !orphanTerminalIds.has(tab.id)
+  )
   const nextExpandedPaneByTabId = { ...state.expandedPaneByTabId }
   const nextCanExpandPaneByTabId = { ...state.canExpandPaneByTabId }
   const nextPendingInitialCwdByTabId = { ...state.pendingInitialCwdByTabId }

@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import type { WorkspaceVisibleTabType } from '../../../../../shared/workspace-layout/tab-groups/tab-types'
 import type { TerminalTab } from '../../../../../shared/workspace-layout/terminal-tab-types'
 import { resolveRepairedActiveTerminalTabId } from './active-terminal-repair'
+import { useAppStore } from '@/store'
 
 type ActiveTerminalRepairInput = {
   activeTabType: WorkspaceVisibleTabType
@@ -29,7 +30,12 @@ export function repairActiveTerminalTab({
     activeTabType,
     activeTabId,
     rememberedTabId,
-    tabs
+    tabs,
+    // Read, not subscribed: repair only acts when the active tab changes or vanishes.
+    unifiedTabs:
+      renderedActiveWorktreeId === null
+        ? undefined
+        : useAppStore.getState().unifiedTabsByWorktree[renderedActiveWorktreeId]
   })
   if (!repairedTabId) {
     return false

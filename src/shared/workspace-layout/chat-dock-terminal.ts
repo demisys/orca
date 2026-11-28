@@ -21,6 +21,18 @@ export function isAttachedChatDock(
   return tab.chatDock !== undefined && !!findChatDockOwnerTab(unifiedTabs, tab.chatDock.ownerTabId)
 }
 
+/** Terminal entries that get a tab-bar entry; a terminal-backed chat among them can own a dock too. */
+export function tabBarTerminalEntries<E extends { tab: Pick<TerminalTab, 'id' | 'chatDock'> }>(
+  entries: readonly E[],
+  chatTabs: readonly Pick<Tab, 'id' | 'entityId'>[]
+): E[] {
+  const owners = [
+    ...chatTabs,
+    ...entries.flatMap(({ tab }) => (tab.chatDock ? [] : [{ id: tab.id, entityId: tab.id }]))
+  ]
+  return entries.filter(({ tab }) => !isAttachedChatDock(tab, owners))
+}
+
 /** The first terminal a user can see in the tab bar; docked shells never receive workspace commands. */
 export function firstTabBarTerminal<T extends { chatDock?: unknown }>(
   tabs: readonly T[] | undefined

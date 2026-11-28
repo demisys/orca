@@ -27,8 +27,11 @@ import { settleAgentLaunchPaneStart } from '@/lib/agent-session/launch/pane/agen
 import { settleAttentionRemovedBy } from '../../slices/workspace-attention/attention-removal-follow-up'
 import { runAsAutomaticDeselection } from '../../workspaces/selection/active-worktree-deselection-intent'
 import { recordDraft, tabBucketDraft } from '../../record-transitions/keyed-record-transitions'
-import { closeChatDockTerminalsOwnedBy } from '../tabs/creation/chat-dock-terminal-creation'
-import { firstTabBarTerminal } from '../../../../../shared/workspace-layout/chat-dock-terminal'
+import { closeChatDockTerminalsOwnedBy } from './chat-dock-terminal-close'
+import {
+  firstTabBarTerminal,
+  isAttachedChatDock
+} from '../../../../../shared/workspace-layout/chat-dock-terminal'
 
 export function createTerminalTabCloseActions(
   set: TerminalStoreSet,
@@ -133,7 +136,9 @@ export function createTerminalTabCloseActions(
             closeReason === 'user' &&
             opts?.captureRecentlyClosed !== false &&
             closedTab &&
-            closedWorktreeId
+            closedWorktreeId &&
+            // Reopening a docked shell would bring it back as a plain tab, outside its chat.
+            !isAttachedChatDock(closedTab, s.unifiedTabsByWorktree[closedWorktreeId])
               ? {
                   ...(closedTab.startupCwd ? { startupCwd: closedTab.startupCwd } : {}),
                   ...(closedTab.shellOverride ? { shellOverride: closedTab.shellOverride } : {}),
@@ -292,6 +297,8 @@ export function createTerminalTabCloseActions(
       }
       // Share snapshot/removal sweeps so one path cannot silently miss newly added cleanup.
       sweepRetiredTerminalTabState(get(), tabId, closingWorktreeId)
+      // Before the chat's own tab goes, so its docks can still find the host it ran on.
+      closeChatDockTerminalsOwnedBy(get, tabId, closeReason)
       for (const tabs of Object.values(get().unifiedTabsByWorktree)) {
         const workspaceItem = tabs.find(
           (entry) => entry.contentType === 'terminal' && entry.entityId === tabId
@@ -311,7 +318,6 @@ export function createTerminalTabCloseActions(
           }
         }
       }
-      closeChatDockTerminalsOwnedBy(get, tabId)
     }
   }
 }

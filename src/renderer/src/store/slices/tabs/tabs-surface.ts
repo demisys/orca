@@ -3,7 +3,10 @@ import type { AppState } from '../../types'
 import { toVisibleTabType } from '../../../../../shared/workspace-layout/tab-groups/tab-types'
 import type { WorkspaceVisibleTabType } from '../../../../../shared/workspace-layout/tab-groups/tab-types'
 import { isEditorTabContentType } from '../editor/tabs/editor-tab-content-type'
-import { firstTabBarTerminal } from '../../../../../shared/workspace-layout/chat-dock-terminal'
+import {
+  firstTabBarTerminal,
+  isAttachedChatDock
+} from '../../../../../shared/workspace-layout/chat-dock-terminal'
 
 export type ActiveSurfaceSourceState = Pick<
   AppState,
@@ -57,7 +60,11 @@ export function deriveActiveSurfaceForWorktree(
     ? browserTabs.some((tab) => tab.id === restoredBrowserTabId)
     : false
   const terminalTabStillExists = restoredTerminalTabId
-    ? terminalTabs.some((tab) => tab.id === restoredTerminalTabId)
+    ? terminalTabs.some(
+        (tab) =>
+          tab.id === restoredTerminalTabId &&
+          !isAttachedChatDock(tab, state.unifiedTabsByWorktree[worktreeId])
+      )
     : false
   const hasGroupOwnedSurface = groups.length > 0 || Boolean(state.layoutByWorktree[worktreeId])
 

@@ -12,13 +12,15 @@ import {
   type NativeChatComposeTarget
 } from '../compose-panel/NativeChatComposePanel'
 import { NativeChatComposerNotices } from '../controls/NativeChatComposerNotices'
-import { isChatDockTerminalElement } from '../terminal-panel/chat-dock-terminal-portal'
+import { isInChatDockPanelOf } from '../terminal-panel/chat-dock-terminal-portal'
 import {
   NativeChatTerminalPanel,
-  setNativeChatTerminalPanelOpen,
-  useNativeChatTerminalDock,
-  useNativeChatTerminalPanelOpen
+  useNativeChatTerminalDock
 } from '../terminal-panel/NativeChatTerminalPanel'
+import {
+  setNativeChatTerminalPanelOpen,
+  useNativeChatTerminalPanelOpen
+} from '../terminal-panel/native-chat-terminal-panel-state'
 import { NativeChatImageAttachmentPreview } from '../../attachments/chips/NativeChatImageAttachmentPreview'
 
 import { useNativeChatComposerDraftUnsaved } from '../../drafts/use-native-chat-draft-unsaved'
@@ -227,9 +229,10 @@ export function NativeChatComposerField({
     if (!terminalDock) {
       return
     }
-    // The shell is about to move out of view; keep typing landing in the chat, not on <body>.
+    // The shell is about to move out of view; keep typing landing in this chat, not on <body>.
     const active = document.activeElement
-    const focusComposer = !active || active === document.body || isChatDockTerminalElement(active)
+    const focusComposer =
+      !active || active === document.body || isInChatDockPanelOf(active, terminalDock.ownerTabId)
     setNativeChatTerminalPanelOpen(terminalDock.ownerTabId, false)
     if (focusComposer) {
       textareaRef.current?.focus()

@@ -1,11 +1,16 @@
 import { useMemo, useSyncExternalStore } from 'react'
 import type { ActivityTerminalPortalTarget } from '../../../activity/terminal-portal/activity-terminal-portal'
 
-/** Marks the panel root so app shortcuts can leave docked-shell keys to the shell. */
+/** Marks the panel root with its chat's tab id. */
 export const CHAT_DOCK_TERMINAL_ATTRIBUTE = 'data-chat-dock-terminal'
 
-export function isChatDockTerminalElement(target: EventTarget | null): boolean {
-  return target instanceof Element && target.closest(`[${CHAT_DOCK_TERMINAL_ATTRIBUTE}]`) !== null
+export function isInChatDockPanelOf(target: EventTarget | null, ownerTabId: string): boolean {
+  return (
+    target instanceof Element &&
+    target
+      .closest(`[${CHAT_DOCK_TERMINAL_ATTRIBUTE}]`)
+      ?.getAttribute(CHAT_DOCK_TERMINAL_ATTRIBUTE) === ownerTabId
+  )
 }
 
 /** Marks where the docked shell's terminal draws, apart from the panel's header and resize edge. */

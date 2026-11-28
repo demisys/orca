@@ -4,7 +4,7 @@ import { isAgentSessionTab } from '../tab-projection/terminal-surfaces'
 import { toWebTerminalSurfaceTabId } from '../../../../../shared/workspace-layout/terminal-surface-id'
 import {
   firstTabBarTerminal,
-  isAttachedChatDock
+  tabBarTerminalEntries
 } from '../../../../../shared/workspace-layout/chat-dock-terminal'
 import {
   resolveWebSessionSiblingVisibleTabId,
@@ -49,10 +49,10 @@ export function prepareWebSessionTabsSnapshotUnified(
   const mirroredEditorUnifiedTabs = mirroredEditorTabs.map((entry) => entry.unifiedTab)
   const mirroredAgentUnifiedTabs = mirroredAgentTabs.map((entry) => entry.unifiedTab)
   // A docked shell portals into its chat, so it gets no tab-bar entry while that chat is open.
-  const chatDockOwners = [...retainedUnifiedTabs, ...mirroredAgentUnifiedTabs]
-  const tabBarTerminalTabs = mirroredTerminalTabs.filter(
-    (entry) => !isAttachedChatDock(entry.tab, chatDockOwners)
-  )
+  const tabBarTerminalTabs = tabBarTerminalEntries(mirroredTerminalTabs, [
+    ...retainedUnifiedTabs,
+    ...mirroredAgentUnifiedTabs
+  ])
   const tabBarTerminalIds = new Set(tabBarTerminalTabs.map((entry) => entry.tab.id))
   const mirroredTerminalUnifiedTabs = tabBarTerminalTabs.map((entry) =>
     buildTerminalUnifiedTab(
@@ -147,7 +147,7 @@ export function prepareWebSessionTabsSnapshotUnified(
       : null
   // Why: caller intent targets the requested tab even when an older host leaves its own active tab unchanged.
   const intentTerminalId =
-    honorSnapshotActiveFocus && navigationIntentTab?.type === 'terminal'
+    honorSnapshotActiveFocus && tabBarTerminalIds.has(intentMirroredTerminalId ?? '')
       ? intentMirroredTerminalId
       : null
   const nextActiveTerminalId =
