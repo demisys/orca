@@ -1,5 +1,6 @@
 import type { PaneManager } from '@/lib/pane-manager/pane-manager'
 import { focusNativeChatPromptCard } from '../../native-chat/prompts/use-native-chat-prompt-card-focus'
+import { findChatDockTerminalHost } from '../../native-chat/composer/terminal-panel/chat-dock-terminal-portal'
 
 const NATIVE_CHAT_COVER_SELECTOR = '.native-chat-pane-shell'
 
@@ -27,9 +28,24 @@ export function focusNativeChatCover(pane: { container: Pick<Element, 'querySele
   return true
 }
 
-/** True for anything inside a chat cover, including the shell before a chat root mounts. */
-export function isInsideNativeChatCover(target: EventTarget | null): boolean {
-  return target instanceof Element && target.closest(NATIVE_CHAT_COVER_SELECTOR) !== null
+/** True inside a docked shell that `ownScope` (a terminal pane) is not part of. */
+export function isInsideForeignChatDock(target: EventTarget | null, ownScope: Element): boolean {
+  const host = findChatDockTerminalHost(target)
+  return host !== null && !host.contains(ownScope)
+}
+
+/** True inside a chat cover (even before its chat root mounts), except within ownScope's own docked shell. */
+export function isInsideNativeChatCover(
+  target: EventTarget | null,
+  ownScope: Element | null
+): boolean {
+  if (!(target instanceof Element)) {
+    return false
+  }
+  if (ownScope && findChatDockTerminalHost(target)?.contains(ownScope)) {
+    return false
+  }
+  return target.closest(NATIVE_CHAT_COVER_SELECTOR) !== null
 }
 
 /** Mirrors focusActivePane's target so the guard tracks exactly the pane that would take focus. */

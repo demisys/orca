@@ -8,6 +8,13 @@ export function isChatDockTerminalElement(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest(`[${CHAT_DOCK_TERMINAL_ATTRIBUTE}]`) !== null
 }
 
+/** Marks where the docked shell's terminal draws, apart from the panel's header and resize edge. */
+export const CHAT_DOCK_TERMINAL_HOST_ATTRIBUTE = 'data-chat-dock-terminal-host'
+
+export function findChatDockTerminalHost(target: EventTarget | null): Element | null {
+  return target instanceof Element ? target.closest(`[${CHAT_DOCK_TERMINAL_HOST_ATTRIBUTE}]`) : null
+}
+
 // Chat panels publish where their docked shell should draw; the workspace keeps owning its TerminalPane.
 let targets: ActivityTerminalPortalTarget[] = []
 const subscribers = new Set<() => void>()

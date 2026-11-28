@@ -14,6 +14,7 @@ import { isWebClientLocation } from '@/app-shell/platform/web-client-location'
 import { pasteTextIntoTextControl } from '@/lib/text-input/paste/text-control-paste'
 import { TEXT_CONTROL_PASTE_MAX_BYTES } from '@/lib/text-input/paste/text-control-paste-model'
 import type { NativeChatComposerHandle } from '../composer/native-chat-composer-types'
+import { findChatDockTerminalHost } from '../composer/terminal-panel/chat-dock-terminal-portal'
 
 type NativeChatPasteBridgeRefs = {
   rootRef: RefObject<HTMLDivElement | null>
@@ -79,7 +80,8 @@ export function useNativeChatPasteBridge({
       return
     }
     const onPaste = (event: ClipboardEvent): void => {
-      if (event.defaultPrevented) {
+      // A docked shell's terminal pane takes its own paste.
+      if (event.defaultPrevented || findChatDockTerminalHost(event.target)) {
         return
       }
       if (isEditableTarget(event.target)) {
@@ -141,7 +143,11 @@ export function useNativeChatPasteBridge({
         return
       }
       const activeElement = document.activeElement
-      if (!(activeElement instanceof Element) || !root.contains(activeElement)) {
+      if (
+        !(activeElement instanceof Element) ||
+        !root.contains(activeElement) ||
+        findChatDockTerminalHost(activeElement)
+      ) {
         return
       }
       const field = findNativeChatPasteField(activeElement, root)

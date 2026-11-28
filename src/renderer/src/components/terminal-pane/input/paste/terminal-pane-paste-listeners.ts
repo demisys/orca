@@ -79,7 +79,7 @@ export function registerTerminalPanePasteListeners({
     const target = event.target
     if (
       (target instanceof Element && target.closest('[data-terminal-search-root]')) ||
-      isInsideNativeChatCover(target)
+      isInsideNativeChatCover(target, container)
     ) {
       return
     }
@@ -131,7 +131,7 @@ export function registerTerminalPanePasteListeners({
     const target = event.target
     if (
       (target instanceof Element && target.closest('[data-terminal-search-root]')) ||
-      isInsideNativeChatCover(target)
+      isInsideNativeChatCover(target, container)
     ) {
       return
     }
@@ -187,7 +187,7 @@ export function registerTerminalPanePasteListeners({
       !(activeElementAtDispatch instanceof Element) ||
       !container.contains(activeElementAtDispatch) ||
       activeElementAtDispatch.closest('[data-terminal-search-root]') ||
-      isInsideNativeChatCover(activeElementAtDispatch)
+      isInsideNativeChatCover(activeElementAtDispatch, container)
     ) {
       return
     }
@@ -233,7 +233,7 @@ export function registerTerminalPanePasteListeners({
       !container.contains(activeElement) ||
       isEditableTarget(activeElement) ||
       activeElement.closest('[data-terminal-search-root]') ||
-      isInsideNativeChatCover(activeElement)
+      isInsideNativeChatCover(activeElement, container)
     ) {
       return
     }

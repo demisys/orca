@@ -220,7 +220,7 @@ export function createTerminalKeyboardEventHandlers(context: EventContext) {
     }
     // Covering chat owns find and selection; the hidden terminal buffer is not the visible surface.
     if (
-      isInsideNativeChatCover(e.target) &&
+      isInsideNativeChatCover(e.target, keyboardScope) &&
       (action.type === 'toggleSearch' ||
         action.type === 'selectAll' ||
         action.type === 'copySelection' ||

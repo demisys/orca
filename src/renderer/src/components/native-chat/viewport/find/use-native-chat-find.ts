@@ -16,6 +16,7 @@ import type { NativeChatComposerHandle } from '../../composer/native-chat-compos
 import type { NativeChatMessageListHandle } from '../../messages/actions/use-native-chat-reveal-latest'
 import { focusNativeChatPromptCard } from '../../prompts/use-native-chat-prompt-card-focus'
 import { addAppKeyListener, removeAppKeyListener } from '@/lib/keyboard/app-keyboard-router'
+import { findChatDockTerminalHost } from '../../composer/terminal-panel/chat-dock-terminal-portal'
 
 // Keep open state/query with the retained chat so reopen preserves its last search.
 export type NativeChatFind = {
@@ -109,7 +110,14 @@ export function useNativeChatFind(
     const platform = getShortcutPlatform()
     const onKeyDown = (e: KeyboardEvent): void => {
       const root = rootRef.current
-      if (e.defaultPrevented || !root || !(e.target instanceof Node) || !root.contains(e.target)) {
+      if (
+        e.defaultPrevented ||
+        !root ||
+        !(e.target instanceof Node) ||
+        !root.contains(e.target) ||
+        // A docked shell searches its own buffer.
+        findChatDockTerminalHost(e.target)
+      ) {
         return
       }
       if (!keybindingMatchesAction('chat.find', e, platform, useAppStore.getState().keybindings)) {

@@ -9,6 +9,7 @@ import { cn } from '@/lib/class-names'
 import { findChatDockTerminal } from '@/store/terminals/tabs/creation/chat-dock-terminal-creation'
 import {
   CHAT_DOCK_TERMINAL_ATTRIBUTE,
+  CHAT_DOCK_TERMINAL_HOST_ATTRIBUTE,
   claimChatDockTerminalPortal
 } from './chat-dock-terminal-portal'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../../../shared/workspace/identity/floating-workspace-id'
@@ -266,7 +267,11 @@ export function NativeChatTerminalPanel({
           </TooltipContent>
         </Tooltip>
       </div>
-      <div ref={setHost} className="relative min-h-0 flex-1 bg-background" />
+      <div
+        ref={setHost}
+        {...{ [CHAT_DOCK_TERMINAL_HOST_ATTRIBUTE]: '' }}
+        className="relative min-h-0 flex-1 bg-background"
+      />
     </div>
   )
 }
