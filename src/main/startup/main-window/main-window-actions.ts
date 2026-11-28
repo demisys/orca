@@ -47,6 +47,7 @@ import {
 import { isHoldingForNewerProtocolDaemon } from '../../daemon/providers/routing/daemon-newer-protocol-hold'
 import { getDaemonProvider } from '../../daemon/providers/lifecycle/daemon-provider-state'
 import { confirmNoDaemonSessionsRemain } from '../../ipc/pty/ipc/pty-management'
+import { releaseStoppedMacDaemonJobs } from '../../daemon/launch/local-terminal-daemon-stop'
 import type { MainWindowOpenOptions } from '../../window/main-window/main-window-contracts'
 import type { DesktopActivationRequest } from '../serve-launch/serve-desktop-activation'
 
@@ -135,6 +136,7 @@ export function quitFromSystemTray(): void {
 
 // Why bounded: a renderer that never pulls the request must not stop sessions on a later reload.
 const QUIT_AND_STOP_ALL_SESSIONS_REQUEST_TTL_MS = 30_000
+const QUIT_COMPLETELY_DAEMON_EXIT_WAIT_MS = 3_000
 let quitAndStopAllSessionsConfirming = false
 // The renderer that consumed the request; only it may then ask main to quit.
 let stoppingAllSessionsWebContentsId: number | null = null
@@ -207,6 +209,8 @@ export async function quitAfterRendererStoppedAllSessions(
     console.warn('[quit] A terminal session is still listed after Kill all; staying open')
     return false
   }
+  // Why wait: the daemon exits on idle just after its last session ends.
+  await releaseStoppedMacDaemonJobs(app.getPath('userData'), QUIT_COMPLETELY_DAEMON_EXIT_WAIT_MS)
   // Why reveal: the window may have been hidden while Kill all ran, and a quit-time save prompt must show.
   quitFromSystemTray()
   return true

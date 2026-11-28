@@ -26,6 +26,8 @@ import { cancelHistoryGc } from '../pty/history/terminal-history-gc'
 import { fenceMainProcessCloudOnQuit } from '../startup/cloud-startup/main-process-connector-startup'
 import { ConnectorTurnEvents } from '../connector-cloud/connector-turn-events'
 import { getCanonicalUserDataPath } from '../persistence/loading-store/user-data-path'
+import { releaseStoppedMacDaemonJobs } from '../daemon/launch/local-terminal-daemon-stop'
+import { getAppEnvironment } from '../../shared/app-lifecycle/app-environment'
 import { flushUnsavedCloudSessions } from '../orca-profiles/cloud-session/profile-cloud-session-owner'
 import { getWorkspaceCleanupRunner } from '../workspaces/cleanup/workspace-cleanup-runner-registry'
 import { shutdownWatchersOnce } from '../startup/quit/filesystem-watcher-quit-shutdown'
@@ -246,9 +248,12 @@ export function beginDesktopCoreShutdown(
   const daemonTeardown = Promise.all([
     removalQuiescence,
     providerRelayDetachesSettled(structuredAgentSessionShutdown)
-  ]).then(() =>
-    native.isDevParentShutdown() ? daemon.shutdownDaemon() : daemon.disconnectDaemon()
-  )
+  ])
+    .then(() =>
+      native.isDevParentShutdown() ? daemon.shutdownDaemon() : daemon.disconnectDaemon()
+    )
+    // Why: a daemon that went idle leaves a stopped launchd job macOS still shows in the Dock.
+    .then(() => releaseStoppedMacDaemonJobs(getAppEnvironment().getPath('userData'), 0))
   return [
     { name: 'worktree-removals', promise: removalShutdown },
     { name: 'state-checkpoint', promise: profileCheckpoint },

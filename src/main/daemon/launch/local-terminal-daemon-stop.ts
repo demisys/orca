@@ -18,12 +18,21 @@ export async function isLocalTerminalDaemonLive(userDataPath: string): Promise<b
   return live === null || live.length > 0
 }
 
-// The job is already stopped once its daemon exits (KeepAlive is off); boot it out so no label is left.
-async function bootOutMacDaemonJobs(userDataPath: string): Promise<void> {
+/**
+ * The job is already stopped once its daemon exits (KeepAlive is off); boot it out so no label is
+ * left, since macOS lists a loaded job under Orca as "Running in Background". Running jobs are kept.
+ */
+export async function releaseStoppedMacDaemonJobs(
+  userDataPath: string,
+  exitWaitMs: number
+): Promise<void> {
+  if (process.platform !== 'darwin') {
+    return
+  }
   const versions = await listMacDaemonJobVersions(userDataPath).catch(() => [])
   for (const version of versions) {
     const service = `gui/${process.getuid?.()}/${macDaemonJobLabel(userDataPath, version)}`
-    await releaseMacDaemonJob(service, Date.now() + MAC_JOB_EXIT_WAIT_MS).catch(() => false)
+    await releaseMacDaemonJob(service, Date.now() + exitWaitMs).catch(() => false)
   }
 }
 
@@ -40,9 +49,7 @@ export async function stopLocalTerminalDaemons(userDataPath: string): Promise<vo
       firstError ??= error
     })
   }
-  if (process.platform === 'darwin') {
-    await bootOutMacDaemonJobs(userDataPath)
-  }
+  await releaseStoppedMacDaemonJobs(userDataPath, MAC_JOB_EXIT_WAIT_MS)
   const left = await listLiveDaemonProtocols(runtimeDir, KNOWN_PROTOCOLS)
   if (left === null || left.length > 0) {
     throw firstError instanceof Error
